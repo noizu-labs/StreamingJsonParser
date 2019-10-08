@@ -56,6 +56,8 @@
 	  * @repo github.com/noizu/trie_gen
 	  */
 #define TRIE_A_UNIT int
+#define TRIE_A_UNIT_SIGNED 1
+#define TRIE_A_UNIT_BITS 32
 #endif
 
 	  /*!

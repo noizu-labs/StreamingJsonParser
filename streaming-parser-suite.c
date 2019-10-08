@@ -2,20 +2,31 @@
 * @file unit-tests
 * @brief test coverage for json_parser library
 *
-* @note relies on a proprietary test framework, test cases need to be ported to ACE Unit or similiar. 
+* @note relies on a proprietary test framework, test cases need to be ported to ACE Unit or similiar.
 * @author Keith Brings
 * @copyright Noizu Labs, Inc 2019
 */
 
-#include "streaming-parser.h"
+//#include "build_settings.h"
 
-#ifdef UNIT_TESTS
+#ifdef UNIT_TESTS_ENABLED
+#if UNIT_TESTS_ENABLED
+
+#include "unit_test_suites.h"
+#include "forecast.h"
+#include "api_callbacks.h"
+#include "osapi.h"
+#include "mem.h"
+#include "action_queue.h"
+#include "uart_pro.h"
+#include "httpc.h"
+#include "trie.h"
 
 struct test_output {
 	nullable_bool_t bool_test;
 	nullable_sint63_t array_test[6];
 	nullable_string_t string_array_test[6];
-	nullable_uint15_t token_array_test[6];
+	nullable_token_t token_array_test[6];
 	nullable_sint63_t enabled;
 	nullable_sint63_t featured;
 	nullable_sint63_t fields;
@@ -45,8 +56,8 @@ void free_test_output() {
 
 
 //! test setup method.
-void ICACHE_FLASH_ATTR json_parser_test_setup() {
-	json_parser_reset();
+void ICACHE_FLASH_ATTR streaming_parser_test_setup() {
+	json_parser_globals_reset();
 	if (req) {
 		os_free(req);
 	}
@@ -60,7 +71,7 @@ void ICACHE_FLASH_ATTR json_parser_test_setup() {
 }
 
 //! test teardown method
-void ICACHE_FLASH_ATTR json_parser_test_teardown() {
+void ICACHE_FLASH_ATTR streaming_parser_test_teardown() {
 	if (req) {
 		os_free(req);
 	}
@@ -86,7 +97,7 @@ jsp_cb_command test_cb(json_parse_state state, json_parser* parser) {
 		if (parser->depth == 1) {
 			if (parser->parent_p->value_type == JSON_LIST_VALUE) {
 				int index = parser->list_index;
-				json_parser__extract_long(parser, &out->array_test[index]);
+				json_parser__extract_sint63(parser, &out->array_test[index]);
 			}
 		}
 	}
@@ -141,31 +152,31 @@ jsp_cb_command test4_cb(json_parse_state state, json_parser* parser) {
 		if (parser->depth == 1) {
 			switch (parser->token) {
 			case JK_FIELDS:
-				json_parser__extract_long(parser, &out->fields);
+				json_parser__extract_sint63(parser, &out->fields);
 				break;
 			case JK_ENABLED:
-				json_parser__extract_long(parser, &out->enabled);
+				json_parser__extract_sint63(parser, &out->enabled);
 				break;
 			case JK_FEATURED:
-				json_parser__extract_long(parser, &out->featured);
+				json_parser__extract_sint63(parser, &out->featured);
 				break;
 
 			case JK_TWO:
-				json_parser__extract_long(parser, &out->two);
+				json_parser__extract_sint63(parser, &out->two);
 				break;
 			}
 		}
 		if (parser->depth == 2) {
 			switch (parser->token) {
 			case JK_ONE:
-				json_parser__extract_long(parser, &out->one);
+				json_parser__extract_sint63(parser, &out->one);
 				break;
 			}
 		}
 		if (parser->depth == 3) {
 			switch (parser->token) {
 			case JK_CONTENTS:
-				json_parser__extract_long(parser, &out->contents);
+				json_parser__extract_sint63(parser, &out->contents);
 				break;
 			}
 		}
@@ -173,7 +184,7 @@ jsp_cb_command test4_cb(json_parse_state state, json_parser* parser) {
 
 			switch (parser->token) {
 			case JK_THREE:
-				json_parser__extract_long(parser, &out->three);
+				json_parser__extract_sint63(parser, &out->three);
 				break;
 			}
 		}
@@ -191,14 +202,14 @@ jsp_cb_command test5b_cb(json_parse_state state, json_parser* parser) {
 		if (parser->depth == 2) {
 			switch (parser->token) {
 			case JK_ONE:
-				json_parser__extract_long(parser, &out->one);
+				json_parser__extract_sint63(parser, &out->one);
 				break;
 			}
 		}
 		if (parser->depth == 3) {
 			switch (parser->token) {
 			case JK_CONTENTS:
-				json_parser__extract_long(parser, &out->contents);
+				json_parser__extract_sint63(parser, &out->contents);
 				break;
 			}
 		}
@@ -206,7 +217,7 @@ jsp_cb_command test5b_cb(json_parse_state state, json_parser* parser) {
 
 			switch (parser->token) {
 			case JK_THREE:
-				json_parser__extract_long(parser, &out->three);
+				json_parser__extract_sint63(parser, &out->three);
 				break;
 			}
 		}
@@ -236,17 +247,17 @@ jsp_cb_command test5_cb(json_parse_state state, json_parser* parser) {
 		if (parser->depth == 1) {
 			switch (parser->token) {
 			case JK_FIELDS:
-				json_parser__extract_long(parser, &out->fields);
+				json_parser__extract_sint63(parser, &out->fields);
 				break;
 			case JK_ENABLED:
-				json_parser__extract_long(parser, &out->enabled);
+				json_parser__extract_sint63(parser, &out->enabled);
 				break;
 			case JK_FEATURED:
-				json_parser__extract_long(parser, &out->featured);
+				json_parser__extract_sint63(parser, &out->featured);
 				break;
 
 			case JK_TWO:
-				json_parser__extract_long(parser, &out->two);
+				json_parser__extract_sint63(parser, &out->two);
 				break;
 			}
 		}
@@ -434,18 +445,139 @@ UNIT_TEST(parse_struct_handler_switch) {
 	ASSERT_EQUAL(out->three.value, 1234);
 }
 
+
+
+/*!
+ * @brief Verify null value parsing in extract_nullable_sint31_t
+ *
+ * See @ref parsers "Parser Notes".
+ */
+UNIT_TEST(extract_nullable_sint31_for_null) {
+	uint8_t input[] = "null";
+	uint8_t* buf = input;
+	nullable_sint31_t sut;
+
+	extract_nullable_sint31(buf, &sut);
+	ASSERT_EQUAL(sut.null, NULL_VALUE);
+	ASSERT_EQUAL(sut.value, 0);
+}
+
+/*!
+ * @brief Verify decimal parsing in extract_nullable_sint31_t.
+ *
+ * See @ref parsers "Parser Notes".
+ */
+UNIT_TEST(extract_nullable_sint31_for_float) {
+	uint8_t input[] = "123.32";
+	uint8_t* buf = input;
+	nullable_sint31_t sut;
+
+	extract_nullable_sint31(buf, &sut);
+	ASSERT_EQUAL(sut.null, NOT_NULL_VALUE);
+	ASSERT_EQUAL(sut.value, 123);
+}
+
+/*!
+ * @brief Verify integer parsing in extract_nullable_sint31_t.
+ *
+ * See @ref parsers "Parser Notes".
+ */
+UNIT_TEST(extract_nullable_sint31_for_int) {
+	uint8_t input[] = "951";
+	uint8_t* buf = input;
+	nullable_sint31_t sut;
+
+	extract_nullable_sint31(buf, &sut);
+	ASSERT_EQUAL(sut.null, NOT_NULL_VALUE);
+	ASSERT_EQUAL(sut.value, 951);
+}
+
+/*!
+ * @brief Verify null parsing in extract_nullable_numeric.
+ *
+ * See @ref parsers "Parser Notes".
+ */
+UNIT_TEST(extract_nullable_double_for_null) {
+	uint8_t input[] = "null";
+	uint8_t* buf = input;
+	nullable_double_t sut;
+
+	extract_nullable_double (buf, &sut);
+	ASSERT_EQUAL(sut.null, NULL_VALUE);
+	ASSERT_EQUAL(sut.value, 0);
+}
+
+/*!
+ * @brief Verify decimal parsing in extract_nullable_numeric.
+ *
+ * See @ref parsers "Parser Notes".
+ */
+UNIT_TEST(extract_nullable_double_for_float) {
+	uint8_t input[] = "123.45";
+	uint8_t* buf = input;
+	nullable_double_t sut;
+
+	extract_nullable_double(buf, &sut);
+	ASSERT_EQUAL(sut.null, NOT_NULL_VALUE);
+	ASSERT_EQUAL(sut.value, 123.45);
+}
+
+/*!
+ * @brief Verify integer parsing in extract_nullable_numeric.
+ *
+ * See @ref parsers "Parser Notes".
+ */
+UNIT_TEST(extract_nullable_double_for_int) {
+	uint8_t input[] = "951";
+	uint8_t* buf = input;
+	nullable_double_t sut;
+
+	extract_nullable_double(buf, &sut);
+	ASSERT_EQUAL(sut.null, NOT_NULL_VALUE);
+	ASSERT_EQUAL(sut.value, 951);
+}
+
+/*!
+ * @brief Verify negative decimal parsing in extract_nullable_numeric.
+ *
+ * See @ref parsers "Parser Notes".
+ */
+UNIT_TEST(extract_nullable_double_for_nfloat) {
+	uint8_t input[] = "-123.45";
+	uint8_t* buf = input;
+	nullable_double_t sut;
+
+	extract_nullable_double(buf, &sut);
+	ASSERT_EQUAL(sut.null, NOT_NULL_VALUE);
+	ASSERT_EQUAL(sut.value, -123.45);
+}
+
+/*!
+ * @brief Verify negative integer parsing in extract_nullable_numeric.
+ *
+ * See @ref parsers "Parser Notes".
+ */
+UNIT_TEST(extract_nullable_double_for_nint) {
+	uint8_t input[] = "-951";
+	uint8_t* buf = input;
+	nullable_double_t sut;
+
+	extract_nullable_double(buf, &sut);
+	ASSERT_EQUAL(sut.null, NOT_NULL_VALUE);
+	ASSERT_EQUAL(sut.value, -951);
+}
+
 /*!
  *@brief
  *
  *
  */
-test_outcome ICACHE_FLASH_ATTR json_parser_suite() {
+test_outcome ICACHE_FLASH_ATTR streaming_parser_suite() {
 	test_outcome test_run = { 0 };
-	test_setup_ptr s = json_parser_test_setup;
-	test_teardown_ptr td = json_parser_test_teardown;
+	test_setup_ptr s = streaming_parser_test_setup;
+	test_teardown_ptr td = streaming_parser_test_teardown;
 
-
-	// DataStream Revamp
+	// Streaming Parser
 	run(test_parse_bool_true, &test_run, s, td);
 	run(test_parse_bool_false, &test_run, s, td);
 	run(test_parse_array, &test_run, s, td);
@@ -454,8 +586,18 @@ test_outcome ICACHE_FLASH_ATTR json_parser_suite() {
 	run(test_parse_struct, &test_run, s, td);
 	run(test_parse_struct_handler_switch, &test_run, s, td);
 
+	// Low Level Parsers
+	run(test_extract_nullable_sint31_for_null, &test_run, s, td);
+	run(test_extract_nullable_sint31_for_float, &test_run, s, td);
+	run(test_extract_nullable_sint31_for_int, &test_run, s, td);
+	run(test_extract_nullable_double_for_null, &test_run, s, td);
+	run(test_extract_nullable_double_for_float, &test_run, s, td);
+	run(test_extract_nullable_double_for_int, &test_run, s, td);
+	run(test_extract_nullable_double_for_nfloat, &test_run, s, td);
+	run(test_extract_nullable_double_for_nint, &test_run, s, td);
 
 	return test_run;
 }
 
+#endif
 #endif

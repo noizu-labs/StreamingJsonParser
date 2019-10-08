@@ -1,8 +1,15 @@
-﻿#include "streaming-parser.h"
+﻿/*!
+ * @file streaming-parser.c
+ *
+ * @author Keith Brings
+ * @copyright Noizu Labs, Inc.
+ */
 
-//--------------------------------
-// Declarations: Main Entry Point
-//--------------------------------
+#include "streaming-parser.h"
+
+ //--------------------------------
+ // Declarations: Main Entry Point
+ //--------------------------------
 jsp_cb_command ICACHE_FLASH_ATTR json_streaming_parser(json_parser* parser);
 
 //--------------------------------
@@ -275,7 +282,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process(json_parser* parser) {
 	case PS_COMPLETE:
 		return parser->parse_state;
 
-	default: 
+	default:
 		return PS_ERROR;
 	}
 }
@@ -926,9 +933,9 @@ json_parser* ICACHE_FLASH_ATTR spawn_json_parser(json_parser* parser) {
 
 json_parser* ICACHE_FLASH_ATTR drop_json_parser(json_parser* parser) {
 	uint8_t skip = parser->char_skip;
-	
+
 	if (parser->parent_p) {
-		json_parser* p = parser->parent_p;		
+		json_parser* p = parser->parent_p;
 		reset_json_parser(parser);
 
 		parser->list_index = 0;
@@ -1139,7 +1146,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_key(json_parser* parser, nullable
 			len++;
 		}
 		if (len >= 0) {
-			out->value = (uint8_t*) os_zalloc(len + 1);
+			out->value = (uint8_t*)os_zalloc(len + 1);
 			if (out->value) {
 				if (len) {
 					os_memcpy(out->value, (parser->req->buffer + s), len);
@@ -1177,7 +1184,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_string(json_parser* parser, nulla
 
 	if (parser->value_close > parser->value_start && (parser->value_type == JSON_DOUBLE_QUOTE_VALUE || parser->value_type == JSON_QUOTE_VALUE)) {
 		uint16_t len = parser->value_close - parser->value_start - 1;
-		out->value = (uint8_t*) os_zalloc(len + 1);
+		out->value = (uint8_t*)os_zalloc(len + 1);
 		if (out->value) {
 			if (len) {
 				os_memcpy(out->value, (parser->req->buffer + parser->value_start + 1), len);
@@ -1190,7 +1197,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_string(json_parser* parser, nulla
 }
 
 uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint7(json_parser* parser, nullable_sint7_t* out) {
-	nullable_sint64_t i = {.null = NULL_VALUE,.value = 0};
+	nullable_sint64_t i = { .null = NULL_VALUE,.value = 0 };
 	if (json_parser__extract_sint64(parser, &i)) {
 		out->null = i.null;
 		out->value = i.value;
@@ -1339,7 +1346,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_uint64(json_parser* parser, nulla
 
 
 uint8_t ICACHE_FLASH_ATTR json_parser__extract_float(json_parser* parser, nullable_float_t* out) {
-	nullable_double_t v = { .null = 1,.value = 0.0 };
+	nullable_double_t v = { .null = NULL_VALUE,.value = 0.0 };
 	if (json_parser__extract_double(parser, &v)) {
 		out->null = v.null;
 		out->value = v.value;
@@ -1398,3 +1405,188 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_double(json_parser* parser, nulla
 	}
 	return 0;
 }
+
+/*!
+ * @brief parser a nullable_double_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR extract_nullable_double(uint8_t* pt, nullable_double_t* out) {
+	bool negative = false;
+	bool has_value = false;
+	bool post_decimal = false;
+
+	int32_t acc = 0;
+	int32_t deci_divisor = 1;
+	int32_t acc2 = 0;
+	uint8_t* p = pt;
+	if (*pt == '-') negative = true, pt++;
+	else if (*pt == '+') pt++;
+	if (!(*pt < '0' || *pt > '9')) has_value = true;
+	do {
+		if (*pt == '.') {
+			pt++;
+			break;
+		}
+		if (*pt < '0' || *pt > '9') break;
+		acc = (acc * 10) + (*pt - '0');
+	} while (pt++);
+
+	do {
+		if (*pt < '0' || *pt > '9') break;
+		else deci_divisor *= 10, acc2 = (acc2 * 10) + (*pt - '0');
+	} while (pt++);
+
+
+	out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
+	if (has_value) {
+		out->value = acc;
+		out->value += (((double)acc2) / ((double)deci_divisor));
+		if (negative) out->value = -out->value;
+		return (uint8_t)(pt - p);
+	}
+	else {
+		out->value = (double)0.0f;
+		return 0;
+	}
+}
+
+/*!
+ * @brief parser a nullable_float_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR extract_nullable_float(uint8_t* parser, nullable_float_t* out) {
+	nullable_double_t v = { .null = NULL_VALUE,.value = 0.0 };
+	uint8_t r = extract_nullable_double(parser, &v);
+	out->value = (float)v.value;
+	out->null = v.null;
+	return r;
+}
+
+
+/*!
+ * @brief parser a nullable_sint64_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR extract_nullable_sint64(uint8_t* pt, nullable_sint64_t* out) {
+	bool negative = false;
+	bool has_value = false;
+	int32_t acc = 0;
+	uint8_t* p = 0;
+	if (*pt == '-') negative = true, pt++;
+	else if (*pt == '+') pt++;
+	if (!(*pt < '0' || *pt > '9')) has_value = true;
+	do {
+		if (*pt < '0' || *pt > '9') break;
+		else acc = (acc * 10) + (*pt - '0');
+	} while (pt++);
+	out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
+	out->value = negative ? -acc : acc;
+	return has_value ? (uint8_t)(pt - p) : 0;
+}
+
+/*!
+ * @brief parser a nullable_sint63_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR  extract_nullable_sint63(uint8_t* parser, nullable_sint63_t* out) {
+	nullable_sint64_t v = { .null = NULL_VALUE,.value = 0 };
+	uint8_t r = extract_nullable_sint64(parser, &v);
+	out->value = (sint64_t)v.value;
+	out->null = v.null;
+	return r;
+}
+
+/*!
+ * @brief parser a nullable_sint31_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR  extract_nullable_sint31(uint8_t* parser, nullable_sint31_t* out) {
+	nullable_sint64_t v = { .null = NULL_VALUE,.value = 0 };
+	uint8_t r = extract_nullable_sint64(parser, &v);
+	out->value = (sint32_t)v.value;
+	out->null = v.null;
+	return r;
+}
+
+/*!
+ * @brief parser a nullable_sint15_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR  extract_nullable_sint15(uint8_t* parser, nullable_sint15_t* out) {
+	nullable_sint64_t v = { .null = NULL_VALUE,.value = 0 };
+	uint8_t r = extract_nullable_sint64(parser, &v);
+	out->value = (sint16_t)v.value;
+	out->null = v.null;
+	return r;
+}
+
+/*!
+ * @brief parser a nullable_sint7_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR  extract_nullable_sint7(uint8_t* parser, nullable_sint7_t* out) {
+	nullable_sint64_t v = { .null = NULL_VALUE,.value = 0 };
+	uint8_t r = extract_nullable_sint64(parser, &v);
+	out->value = (sint8_t)v.value;
+	out->null = v.null;
+	return r;
+}
+
+/*!
+ * @brief parser a nullable_uint64_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR extract_nullable_uint64(uint8_t* pt, nullable_uint64_t* out) {
+	bool negative = false;
+	bool has_value = false;
+	int32_t acc = 0;
+	uint8_t p = pt;
+	if (*pt == '-') negative = true, pt++;
+	else if (*pt == '+') pt++;
+	if (!(*pt < '0' || *pt > '9')) has_value = true;
+	do {
+		if (*pt < '0' || *pt > '9') break;
+		else acc = (acc * 10) + (*pt - '0');
+	} while (pt++);
+	out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
+	out->value = negative ? -acc : acc;
+	return has_value ? (uint8_t)(pt - p) : 0;
+}
+
+/*!
+ * @brief parser a nullable_uint63_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint63(uint8_t* parser, nullable_uint63_t* out) {
+	nullable_uint64_t v = { .null = NULL_VALUE,.value = 0 };
+	uint8_t r = extract_nullable_uint64(parser, &v);
+	out->value = (uint64_t)v.value;
+	out->null = v.null;
+	return r;
+}
+
+/*!
+ * @brief parser a nullable_uint31_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint31(uint8_t* parser, nullable_uint31_t* out) {
+	nullable_uint64_t v = { .null = NULL_VALUE,.value = 0 };
+	uint8_t r = extract_nullable_uint64(parser, &v);
+	out->value = (uint32_t)v.value;
+	out->null = v.null;
+	return r;
+}
+
+/*!
+ * @brief parser a nullable_uint15_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint15(uint8_t* parser, nullable_uint15_t* out) {
+	nullable_uint64_t v = { .null = NULL_VALUE,.value = 0 };
+	uint8_t r = extract_nullable_uint64(parser, &v);
+	out->value = (uint16_t)v.value;
+	out->null = v.null;
+	return r;
+}
+
+/*!
+ * @brief parser a nullable_uint7_t from buffer
+ */
+uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint7(uint8_t* parser, nullable_uint7_t* out) {
+	nullable_uint64_t v = { .null = NULL_VALUE,.value = 0 };
+	uint8_t r = extract_nullable_uint64(parser, &v);
+	out->value = (uint8_t)v.value;
+	out->null = v.null;
+	return r;
+}
+
+

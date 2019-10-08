@@ -1,3 +1,11 @@
+/*!
+ * @file streaming-parser.h
+ * @headerfile streaming-parser.h "streaming-parser.h"
+ *
+ * @author Keith Brings
+ * @copyright Noizu Labs, Inc.
+ */
+
 #ifndef __STREAMING_PARSER_H__ 
 #define __STREAMING_PARSER_H__
 #include "noizu_trie_a.h"
@@ -163,10 +171,33 @@ typedef struct nullable_uint64_t {
 } nullable_uint64_t;
 
 
+//------------------------------
+// Nullable Trie Token
+//------------------------------
+#if ((TRIE_A_UNIT_BITS % 4) == 0) 
+#define NULLABLE_TOKEN_BITS 4
+#else 
+#define NULLABLE_TOKEN_BITS (TRIE_A_UNIT_BITS % 4) 
+#endif
+
+#if TRIE_A_UNIT_BITS < 64 
+#if TRIE_A_UNIT_SIGNED 
+typedef struct nullable_token_t {
+	sint64_t value: TRIE_A_UNIT_BITS;
+	uint8_t null: NULLABLE_TOKEN_BITS;
+} nullable_token_t;
+#else 
+typedef struct nullable_token_t {
+	uint64_t value : TRIE_A_UNIT_BITS;
+	uint8_t null : NULLABLE_TOKEN_BITS;
+} nullable_token_t;
+#endif
+#else 
 typedef struct nullable_token_t {
 	TRIE_A_UNIT value;
 	uint8_t null;
 } nullable_token_t;
+#endif
 
 /*!
  * @brief float with nullable flag
@@ -369,5 +400,21 @@ uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint64(json_parser* parser, null
 
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_float(json_parser* parser, nullable_float_t* out);
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_double(json_parser* parser, nullable_double_t* out);
+
+// Low Level
+uint8_t ICACHE_FLASH_ATTR extract_nullable_double(uint8_t* pt, nullable_double_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_float(uint8_t* parser, nullable_float_t* out);
+
+uint8_t ICACHE_FLASH_ATTR extract_nullable_uint64(uint8_t* pt, nullable_uint64_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_uint63(uint8_t* parser, nullable_uint63_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_uint31(uint8_t* parser, nullable_uint31_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_uint15(uint8_t* parser, nullable_uint15_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_uint7(uint8_t* parser, nullable_uint7_t* out);
+
+uint8_t ICACHE_FLASH_ATTR extract_nullable_sint64(uint8_t* pt, nullable_sint64_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_sint63(uint8_t* parser, nullable_sint63_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_sint31(uint8_t* parser, nullable_sint31_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_sint15(uint8_t* parser, nullable_sint15_t* out);
+uint8_t ICACHE_FLASH_ATTR extract_nullable_sint7(uint8_t* parser, nullable_sint7_t* out);
 
 #endif

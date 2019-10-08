@@ -21,6 +21,9 @@ TRIE_A_UNIT noizu_trie_a_advance(char key, TRIE_A_UNIT current_node, noizu_trie_
 		if (source[trie_node][TRIE_A_CHARACTER] < key) {
 			trie_node = source[trie_node][TRIE_A_SIBLING];
 		}
+		else {
+			return TRIE_NOT_FOUND;
+		}
 	}
 	return TRIE_NOT_FOUND;
 }
