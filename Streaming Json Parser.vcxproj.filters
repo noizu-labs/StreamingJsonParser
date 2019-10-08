@@ -21,22 +21,30 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="noizu_trie_a.h">
-      <Filter>import\noizu_trie</Filter>
-    </ClInclude>
     <ClInclude Include="streaming-parser.h">
       <Filter>import</Filter>
     </ClInclude>
+    <ClInclude Include="noizu_trie\noizu_trie_a.h">
+      <Filter>import\noizu_trie</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="noizu_trie_a.c">
-      <Filter>import\noizu_trie</Filter>
-    </ClCompile>
     <ClCompile Include="main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="streaming-parser.c">
       <Filter>import</Filter>
     </ClCompile>
+    <ClCompile Include="unit-tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="noizu_trie\noizu_trie_a.c">
+      <Filter>import\noizu_trie</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="noizu_trie\LICENSE">
+      <Filter>import\noizu_trie</Filter>
+    </None>
   </ItemGroup>
 </Project>
