@@ -7,6 +7,9 @@
 
 #include "streaming-parser.h"
 
+#pragma warning(push)
+#pragma warning(disable: 26451 4996)
+
  //--------------------------------
  // Declarations: Main Entry Point
  //--------------------------------
@@ -960,14 +963,16 @@ json_parser* ICACHE_FLASH_ATTR drop_json_parser(json_parser* parser) {
 
 json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer* req, noizu_trie_a* trie, json_streaming_parser_event_cb cb, void* output) {
 	json_parser* r = (json_parser*)os_zalloc(sizeof(json_parser));
-	r->cb = cb;
-	r->output = output;
-	r->req = req;
-	r->trie = trie;
-	r->trie_index = 1;
-	r->parse_state = PS_ADVANCE_KEY;
-	r->value_type = JSON_ERROR_VALUE;
-	r->active = 1;
+	if (r) {
+		r->cb = cb;
+		r->output = output;
+		r->req = req;
+		r->trie = trie;
+		r->trie_index = 1;
+		r->parse_state = PS_ADVANCE_KEY;
+		r->value_type = JSON_ERROR_VALUE;
+		r->active = 1;
+	}
 	return r;
 }
 
@@ -993,7 +998,7 @@ void ICACHE_FLASH_ATTR print_json_parser_path(json_parser* parser, uint32_t line
 	while (p) {
 		char key[32] = { 0 };
 		if (p->key_close && p->key_close < p->req->buffer_size && p->key_start < p->req->buffer_size) {
-			os_memcpy(key, parser->req->buffer + parser->key_start, parser->key_close - parser->key_start + 1);
+			os_memcpy(key, parser->req->buffer + parser->key_start, (parser->key_close - parser->key_start) + 1);
 			os_printf("(%s|%d)", key, p->value_type);
 		}
 		else {
@@ -1200,7 +1205,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint7(json_parser* parser, nullab
 	nullable_sint64_t i = { .null = NULL_VALUE,.value = 0 };
 	if (json_parser__extract_sint64(parser, &i)) {
 		out->null = i.null;
-		out->value = i.value;
+		out->value = (sint8_t)i.value;
 		return 1;
 	}
 	return 0;
@@ -1210,7 +1215,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint15(json_parser* parser, nulla
 	nullable_sint64_t i = { .null = NULL_VALUE,.value = 0 };
 	if (json_parser__extract_sint64(parser, &i)) {
 		out->null = i.null;
-		out->value = i.value;
+		out->value = (sint16_t) i.value;
 		return 1;
 	}
 	return 0;
@@ -1220,7 +1225,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint31(json_parser* parser, nulla
 	nullable_sint64_t i = { .null = NULL_VALUE,.value = 0 };
 	if (json_parser__extract_sint64(parser, &i)) {
 		out->null = i.null;
-		out->value = i.value;
+		out->value = (sint32_t) i.value;
 		return 1;
 	}
 	return 0;
@@ -1279,7 +1284,7 @@ uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint7(json_parser* parser, nulla
 	nullable_uint64_t i = { .null = NULL_VALUE,.value = 0 };
 	if (json_parser__extract_uint64(parser, &i)) {
 		out->null = i.null;
-		out->value = i.value;
+		out->value = (uint8_t) i.value;
 		return 1;
 	}
 	return 0;
@@ -1289,7 +1294,7 @@ uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint15(json_parser* parser, null
 	nullable_uint64_t i = { .null = NULL_VALUE,.value = 0 };
 	if (json_parser__extract_uint64(parser, &i)) {
 		out->null = i.null;
-		out->value = i.value;
+		out->value = (uint16_t) i.value;
 		return 1;
 	}
 	return 0;
@@ -1299,7 +1304,7 @@ uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint31(json_parser* parser, null
 	nullable_uint64_t i = { .null = NULL_VALUE,.value = 0 };
 	if (json_parser__extract_uint64(parser, &i)) {
 		out->null = i.null;
-		out->value = i.value;
+		out->value = (uint32_t) i.value;
 		return 1;
 	}
 	return 0;
@@ -1349,7 +1354,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_float(json_parser* parser, nullab
 	nullable_double_t v = { .null = NULL_VALUE,.value = 0.0 };
 	if (json_parser__extract_double(parser, &v)) {
 		out->null = v.null;
-		out->value = v.value;
+		out->value = (float)v.value;
 		return 1;
 	}
 	else {
@@ -1532,7 +1537,7 @@ uint8_t ICACHE_FLASH_ATTR extract_nullable_uint64(uint8_t* pt, nullable_uint64_t
 	bool negative = false;
 	bool has_value = false;
 	int32_t acc = 0;
-	uint8_t p = pt;
+	uint8_t *p = pt;
 	if (*pt == '-') negative = true, pt++;
 	else if (*pt == '+') pt++;
 	if (!(*pt < '0' || *pt > '9')) has_value = true;
@@ -1590,3 +1595,4 @@ uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint7(uint8_t* parser, nullable_uint
 }
 
 
+#pragma warning(pop)

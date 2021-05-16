@@ -15,7 +15,13 @@
 //------------------------------
 #ifdef GENERIC_MODE
 #include <stdio.h>
+
+#ifdef UNITY_TEST
+#include "unity_memory.h"
+#else
 #include <corecrt_malloc.h>
+#endif
+
 #include <string.h>
 
 #define ICACHE_FLASH_ATTR

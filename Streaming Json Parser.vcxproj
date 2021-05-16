@@ -73,7 +73,7 @@
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)/noizu_trie;</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)/noizu_trie;</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)/;$(ProjectDir)/noizu_trie;$(ProjectDir)/Unity/src/;$(ProjectDir)/Unity/extras/fixture/src;$(ProjectDir)/Unity/extras/memory/src</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -96,7 +96,7 @@
       <SDLCheck>
       </SDLCheck>
       <ConformanceMode>false</ConformanceMode>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);GENERIC_MODE;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);GENERIC_MODE;UNITY_TEST;</PreprocessorDefinitions>
       <OmitFramePointers>false</OmitFramePointers>
       <PrecompiledHeader />
     </ClCompile>
@@ -137,12 +137,25 @@
   <ItemGroup>
     <ClInclude Include="noizu_trie\noizu_trie_a.h" />
     <ClInclude Include="streaming-parser.h" />
+    <ClInclude Include="Test Suite\streaming-parser-suite\support\array_trie.h" />
+    <ClInclude Include="Unity\extras\fixture\src\unity_fixture.h" />
+    <ClInclude Include="Unity\extras\fixture\src\unity_fixture_internals.h" />
+    <ClInclude Include="Unity\extras\memory\src\unity_memory.h" />
+    <ClInclude Include="Unity\src\unity.h" />
+    <ClInclude Include="Unity\src\unity_internals.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c" />
     <ClCompile Include="noizu_trie\noizu_trie_a.c" />
+    <ClCompile Include="streaming-parser-suite.c" />
     <ClCompile Include="streaming-parser.c" />
-    <ClCompile Include="unit-tests.c" />
+    <ClCompile Include="Test Suite\streaming-parser-suite\support\array_trie.c" />
+    <ClCompile Include="Test Suite\TestStreamingParser_Runner.c" />
+    <ClCompile Include="Test Suite\streaming-parser-suite\TestStreamingParser.c" />
+    <ClCompile Include="Test Suite\suite.c" />
+    <ClCompile Include="Unity\extras\fixture\src\unity_fixture.c" />
+    <ClCompile Include="Unity\extras\memory\src\unity_memory.c" />
+    <ClCompile Include="Unity\src\unity.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="noizu_trie\LICENSE" />
