@@ -3,6 +3,9 @@
 
 TEST_GROUP_RUNNER(StreamingParser)
 {
+	RUN_TEST_CASE(StreamingParser, UnitTest_ResizeDynamicArray);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNestedStruct);
+
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolTrue);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalse);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseArray);

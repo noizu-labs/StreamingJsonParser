@@ -59,6 +59,7 @@ jsp_cb_command test_cb(json_parse_state state, json_parser* parser) {
 	return JSPC_PROCEED;
 }
 
+
 jsp_cb_command test2_cb(json_parse_state state, json_parser* parser) {
 	switch (state) {
 		// Extract data from completed json values.
@@ -77,6 +78,7 @@ jsp_cb_command test2_cb(json_parse_state state, json_parser* parser) {
 	return JSPC_PROCEED;
 }
 
+
 jsp_cb_command test3_cb(json_parse_state state, json_parser* parser) {
 	switch (state) {
 	case PS_LIST_ITEM_COMPLETE:
@@ -93,6 +95,7 @@ jsp_cb_command test3_cb(json_parse_state state, json_parser* parser) {
 	}
 	return JSPC_PROCEED;
 }
+
 
 jsp_cb_command test4_cb(json_parse_state state, json_parser* parser) {
 	switch (state) {
@@ -144,6 +147,58 @@ jsp_cb_command test4_cb(json_parse_state state, json_parser* parser) {
 	return JSPC_PROCEED;
 }
 
+
+jsp_cb_command test4b_cb(json_parse_state state, json_parser* parser) {
+	switch (state) {
+
+	case PS_LIST_ITEM_COMPLETE:
+	case PS_COMPLETE:
+	{
+		struct test_output* out = parser->output;
+		if (parser->depth == 1) {
+			switch (parser->token) {
+			case JK_FIELDS:
+				json_parser__extract_sint63(parser, &out->fields);
+				break;
+			case JK_ENABLED:
+				json_parser__extract_sint63(parser, &out->enabled);
+				break;
+			case JK_FEATURED:
+				json_parser__extract_sint63(parser, &out->featured);
+				break;
+
+			case JK_TWO:
+				json_parser__extract_sint63(parser, &out->two);
+				break;
+			}
+		}
+		if (parser->depth == 3) {
+			switch (parser->token) {
+			case JK_ONE:
+				json_parser__extract_sint63(parser, &out->one);
+				break;
+			}
+		}
+		if (parser->depth == 4) {
+			switch (parser->token) {
+			case JK_CONTENTS:
+				json_parser__extract_sint63(parser, &out->contents);
+				break;
+			}
+		}
+		if (parser->depth == 6) {
+
+			switch (parser->token) {
+			case JK_THREE:
+				json_parser__extract_sint63(parser, &out->three);
+				break;
+			}
+		}
+	}
+	}
+	return JSPC_PROCEED;
+}
+
 jsp_cb_command test5b_cb(json_parse_state state, json_parser* parser) {
 	switch (state) {
 	case PS_LIST_ITEM_COMPLETE:
@@ -176,6 +231,7 @@ jsp_cb_command test5b_cb(json_parse_state state, json_parser* parser) {
 	}
 	return JSPC_PROCEED;
 }
+
 
 jsp_cb_command test5_cb(json_parse_state state, json_parser* parser) {
 	switch (state) {
@@ -246,7 +302,79 @@ TEST_TEAR_DOWN(StreamingParser)
 
 
 
+TEST(StreamingParser, UnitTest_ResizeDynamicArray)
+{
 
+	dynamic_array* sut = os_zalloc(sizeof(dynamic_array));
+	if (sut == NULL) {
+		TEST_IGNORE();
+	}
+	noizu_realloc_code r = resize_dynamic_array(sut, sizeof(uint8_t), 256, 512, 7, NULL);
+	TEST_ASSERT_EQUAL(r, NOZ_DYNAMIC_ARRAY__OK_RESIZED);
+	TEST_ASSERT_NOT_NULL(sut);
+	TEST_ASSERT_NOT_NULL(sut->raw_array);
+	TEST_ASSERT_TRUE(sut->allocated > 256);
+	TEST_ASSERT_TRUE(sut->allocated <= (256 + 7));
+
+	sut->size = 256;
+	*((uint8_t*)sut->raw_array) = 'A';
+	*((uint8_t*)sut->raw_array + 255) = 'Z';
+
+	r = resize_dynamic_array(sut, sizeof(uint8_t), 257, 512, 7, NULL);
+	TEST_ASSERT_NOT_NULL(sut->raw_array);
+	TEST_ASSERT_EQUAL(r, NOZ_DYNAMIC_ARRAY__OK_ALLOCATED);
+	TEST_ASSERT_TRUE(sut->allocated > 257);
+	TEST_ASSERT_TRUE(sut->allocated <= (257 + 7));
+
+	TEST_ASSERT_EQUAL(*((uint8_t*)sut->raw_array), 'A');
+	TEST_ASSERT_EQUAL(*((uint8_t*)sut->raw_array + 255), 'Z');
+
+	r = resize_dynamic_array(sut, sizeof(uint8_t), 511, 512, 7, NULL);
+	TEST_ASSERT_NOT_NULL(sut->raw_array);
+	TEST_ASSERT_EQUAL(r, NOZ_DYNAMIC_ARRAY__OK_RESIZED);
+	TEST_ASSERT_TRUE(sut->allocated > 511);
+	TEST_ASSERT_TRUE(sut->allocated <= (511 + 7));
+
+	TEST_ASSERT_EQUAL(*((uint8_t*)sut->raw_array), 'A');
+	TEST_ASSERT_EQUAL(*((uint8_t*)sut->raw_array + 255), 'Z');
+
+	r = resize_dynamic_array(sut, sizeof(uint8_t), 513, 512, 7, NULL);
+	TEST_ASSERT_NOT_NULL(sut->raw_array);
+	TEST_ASSERT_EQUAL(r, NOZ_DYNAMIC_ARRAY__OVERFLOW);
+	TEST_ASSERT_TRUE(sut->allocated > 511);
+	TEST_ASSERT_TRUE(sut->allocated <= (511 + 7));
+
+	TEST_ASSERT_EQUAL(*((uint8_t*)sut->raw_array), 'A');
+	TEST_ASSERT_EQUAL(*((uint8_t*)sut->raw_array + 255), 'Z');
+
+}
+
+TEST(StreamingParser, UnitTest_ParseNestedStruct) {
+
+	uint8_t json[] = "{'enabled': 1, \"featured\": 2, fields: 3, \"inner\": {\"inner\": {apple: 1, bannana: 2, one: 5, wee: {contents: 4, empty: {}, list: [1,2,3,4,{three: 1234}, {}]}}}, two: 6}";
+	req->buffer = json;
+	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
+	json_parser* parser = init_json_parser(req, a_trie(), test4b_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+
+	TEST_ASSERT_EQUAL(out->enabled.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->enabled.value, 1);
+	TEST_ASSERT_EQUAL(out->featured.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->featured.value, 2);
+	TEST_ASSERT_EQUAL(out->fields.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->fields.value, 3);
+	TEST_ASSERT_EQUAL(out->one.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->one.value, 5);
+	TEST_ASSERT_EQUAL(out->two.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->two.value, 6);
+	TEST_ASSERT_EQUAL(out->contents.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->contents.value, 4);
+	TEST_ASSERT_EQUAL(out->three.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->three.value, 1234);
+
+
+}
 
 /*!
  *@brief

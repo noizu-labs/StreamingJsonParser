@@ -8,7 +8,7 @@
 #include "streaming-parser.h"
 
 #pragma warning(push)
-#pragma warning(disable: 26451 4996)
+#pragma warning(disable: 4996 26451)
 
  //--------------------------------
  // Declarations: Main Entry Point
@@ -30,40 +30,27 @@ json_parse_state ICACHE_FLASH_ATTR json_process__CAPTURE_VALUE(json_parser* pars
 void ICACHE_FLASH_ATTR json_parser_globals_reset();
 void ICACHE_FLASH_ATTR reset_json_parser(json_parser* parser);
 void ICACHE_FLASH_ATTR shift_json_parser(uint16_t shift, json_parser* parser);
-void ICACHE_FLASH_ATTR free_parser_children(json_parser* base);
 json_parser* ICACHE_FLASH_ATTR spawn_json_parser(json_parser* parser);
 json_parser* ICACHE_FLASH_ATTR drop_json_parser(json_parser* parser);
 json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer*, noizu_trie_a* trie, json_streaming_parser_event_cb cb, void* output);
 json_parser* ICACHE_FLASH_ATTR top_parser(json_parser* parser);
 
 //--------------------------------
-// Declarations: Debug Output
-//--------------------------------
-void ICACHE_FLASH_ATTR print_json_parser_path(json_parser* parser, uint32_t line);
-void ICACHE_FLASH_ATTR print_json_parser(json_parser* parser, uint8_t offset);
-
-//--------------------------------
 // Declarations: Parsing Helpers
 //--------------------------------
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, noizu_trie_a* trie, nullable_token_t* out);
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_key(json_parser* parser, nullable_string_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_bool(json_parser* parser, nullable_bool_t* out);
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_string(json_parser* parser, nullable_string_t* out);
 
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_sint7(json_parser* parser, nullable_sint7_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_sint15(json_parser* parser, nullable_sint15_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_sint31(json_parser* parser, nullable_sint31_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_sint63(json_parser* parser, nullable_sint63_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_sint64(json_parser* parser, nullable_sint64_t* out);
-
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint7(json_parser* parser, nullable_uint7_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint15(json_parser* parser, nullable_uint15_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint31(json_parser* parser, nullable_uint31_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint63(json_parser* parser, nullable_uint63_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint64(json_parser* parser, nullable_uint64_t* out);
-
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_float(json_parser* parser, nullable_float_t* out);
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_double(json_parser* parser, nullable_double_t* out);
+//--------------------------------
+// Declarations: nullable_string helpers
+//--------------------------------
+nullable_string_t* ICACHE_FLASH_ATTR copy_nullable_string(nullable_string_t* v);
+uint8_t ICACHE_FLASH_ATTR free_nullable_string(nullable_string_t** v, uint8_t free_pointer);
+uint8_t ICACHE_FLASH_ATTR free_nullable_string_contents(nullable_string_t* v);
+uint8_t ICACHE_FLASH_ATTR recycle_nullable_string(nullable_string_t** v, uint16_t size);
+uint8_t ICACHE_FLASH_ATTR allocate_nullable_string(nullable_string_t* v, uint16_t size);
+uint8_t ICACHE_FLASH_ATTR strncpy_nullable_string(nullable_string_t* v, uint8_t* source, uint16_t length);
 
 //---------------------------------
 // Locals
@@ -95,6 +82,8 @@ jsp_cb_command ICACHE_FLASH_ATTR json_streaming_parser(json_parser* base) {
 
 	// process buffer
 	while (req->buffer_pos < req->buffer_size) {
+		// [bug fix] Parser needs to rebase to top after each iteration, to track depth increases correctly.
+		parser = top_parser(parser);
 		json_parse_state r = json_process(parser);
 		switch (r) {
 		case PS_ADVANCE_KEY:
@@ -124,12 +113,12 @@ jsp_cb_command ICACHE_FLASH_ATTR json_streaming_parser(json_parser* base) {
 			if (parser->value_type == JSON_STRUCT_VALUE) {
 				parser = spawn_json_parser(parser);
 				parser->brace_track = 1;
-				parser->token = t;
+				parser->token = (uint8_t)t;
 			}
 			else if (parser->value_type == JSON_LIST_VALUE) {
 				parser = spawn_json_parser(parser);
 				parser->bracket_track = 1;
-				parser->token = t;
+				parser->token = (uint8_t)t;
 			}
 			else {
 				uint16_t ks = parser->key_start;
@@ -145,7 +134,7 @@ jsp_cb_command ICACHE_FLASH_ATTR json_streaming_parser(json_parser* base) {
 				// Only if parent is a struct
 				parser->key_start = ks;
 				parser->key_close = kc;
-				parser->token = t;
+				parser->token = (uint8_t)t;
 				// -------------------------------
 				//parser->parent = 700000 | p;
 				parser->value_start = vs;
@@ -461,10 +450,10 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_VALUE(json_parser* pars
 		switch (c) {
 		case ']':
 			//LOG_ERROR("[JSON] ADVANCE VALUE Reached %c", *(p + parser->req->buffer_pos));
-			//if (parser->parent_p && parser->parent_p->value_type == JSON_LIST_VALUE) {
-			parser->parent_p->value_close = parser->req->buffer_pos;
-			if (parser->parent_p->value_type == JSON_LIST_VALUE) {
+			//if (parser->parent_p && parser->parent_p->value_type == JSON_LIST_VALUE) {			
+			if (parser->parent_p && parser->parent_p->value_type == JSON_LIST_VALUE) {
 				parser->parent_p->parse_state = PS_LIST_COMPLETE;
+				parser->parent_p->value_close = parser->req->buffer_pos;
 			}
 			else {
 				LOG_ERROR("MALFORMED_JSON");
@@ -481,9 +470,9 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_VALUE(json_parser* pars
 		case '}':
 			//LOG_ERROR("[JSON] ADVANCE VALUE Reached %c", *(p + parser->req->buffer_pos));
 			//if (parser->parent_p && parser->parent_p->value_type == JSON_STRUCT_VALUE) {
-			parser->parent_p->value_close = parser->req->buffer_pos;
-			parser->parent_p->parse_state = PS_COMPLETE;
-			if (parser->parent_p->value_type == JSON_STRUCT_VALUE) {
+			if (parser->parent_p && parser->parent_p->value_type == JSON_STRUCT_VALUE) {
+				parser->parent_p->value_close = parser->req->buffer_pos;
+				parser->parent_p->parse_state = PS_COMPLETE;
 				parser->parent_p->parse_state = PS_STRUCT_COMPLETE;
 			}
 			else {
@@ -815,7 +804,7 @@ void ICACHE_FLASH_ATTR  ICACHE_FLASH_ATTR reset_json_parser(json_parser* parser)
 	parser->trie_index = 1;
 	parser->child = c;
 	parser->parent_p = p;
-	parser->parent = pt;
+	parser->parent = (uint8_t)pt;
 	parser->req = req;
 	parser->depth = depth;
 	parser->list_index = 0;
@@ -849,7 +838,7 @@ void ICACHE_FLASH_ATTR shift_json_parser(uint16_t shift, json_parser* parser) {
 	}
 }
 
-void ICACHE_FLASH_ATTR free_parser_children(json_parser* base) {
+void ICACHE_FLASH_ATTR free_json_parser(json_parser* base, BOOL free_pointer) {
 	json_parser* p = base;
 	json_parser* trail = p;
 	while (p) {
@@ -876,10 +865,15 @@ void ICACHE_FLASH_ATTR free_parser_children(json_parser* base) {
 				p->child = NULL;
 				os_free(p);
 			}
-			return;
+			break;
 		}
 	}
+	if (free_pointer) {
+		json_parser_globals_reset();
+		if (base) os_free(base);
+	}
 }
+
 
 json_parser* ICACHE_FLASH_ATTR spawn_json_parser(json_parser* parser) {
 	//print_json_parser_path(parser, __LINE__);
@@ -972,8 +966,9 @@ json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer* req, noizu_trie_a
 		r->parse_state = PS_ADVANCE_KEY;
 		r->value_type = JSON_ERROR_VALUE;
 		r->active = 1;
+		return r;
 	}
-	return r;
+	return NULL;
 }
 
 json_parser* ICACHE_FLASH_ATTR top_parser(json_parser* parser) {
@@ -991,6 +986,9 @@ json_parser* ICACHE_FLASH_ATTR top_parser(json_parser* parser) {
 //--------------------------------
 // Functions: Debug Output
 //--------------------------------
+
+#if defined(NSP_DBG_ENABLED) && NSP_DBG_ENABLED
+
 void ICACHE_FLASH_ATTR print_json_parser_path(json_parser* parser, uint32_t line) {
 	json_parser* p = parser;
 	while (p->parent_p) p = p->parent_p;
@@ -998,7 +996,7 @@ void ICACHE_FLASH_ATTR print_json_parser_path(json_parser* parser, uint32_t line
 	while (p) {
 		char key[32] = { 0 };
 		if (p->key_close && p->key_close < p->req->buffer_size && p->key_start < p->req->buffer_size) {
-			os_memcpy(key, parser->req->buffer + parser->key_start, (parser->key_close - parser->key_start) + 1);
+			os_memcpy(key, parser->req->buffer + parser->key_start, parser->key_close - parser->key_start + 1);
 			os_printf("(%s|%d)", key, p->value_type);
 		}
 		else {
@@ -1013,7 +1011,9 @@ void ICACHE_FLASH_ATTR print_json_parser_path(json_parser* parser, uint32_t line
 	os_printf("\n");
 }
 
+
 void ICACHE_FLASH_ATTR print_json_parser(json_parser* parser, uint8_t offset) {
+
 
 	/*
 	[offset] ----- Parser ------
@@ -1031,7 +1031,7 @@ void ICACHE_FLASH_ATTR print_json_parser(json_parser* parser, uint8_t offset) {
 	[offset    ]----------------- Parser ------------
 	*/
 
-	char* prefix = (char*)os_malloc(offset + 1);
+	char* prefix = (char*)os_zalloc(offset + 1);
 	os_memset(prefix, ' ', offset);
 	*(prefix + offset) = '\0';
 
@@ -1106,10 +1106,426 @@ void ICACHE_FLASH_ATTR print_json_parser(json_parser* parser, uint8_t offset) {
 		print_json_parser(parser->child, offset + 3);
 	}
 }
+#endif
 
 //--------------------------------
 // Functions: Parsing Helpers
 //--------------------------------
+
+uint8_t ICACHE_FLASH_ATTR  json_parser__extract_nullable(json_parser* parser, nullable_type type, void* out) {
+	uint8_t response_code = 0;
+	bool clear = true;
+	if (out) {
+		if (type & INT_TYPE_FLAG || type & DECIMAL_TYPE_FLAG) {
+			if (parser->value_type == JSON_NUMERIC_VALUE && parser->value_close && parser->value_close >= parser->value_start) {
+				clear = false;
+				response_code = extract_nullable(parser->req->buffer + parser->value_start, (parser->value_close - parser->value_start) + 1, type, out);
+			}
+			else if (parser->value_type == JSON_NULL_VALUE) {
+				response_code = 1;
+			}
+			else if (parser->value_type == JSON_QUOTE_VALUE || parser->value_type == JSON_DOUBLE_QUOTE_VALUE) {
+				response_code = extract_nullable(parser->req->buffer + parser->value_start + 1, (parser->value_close - parser->value_start), type, out);
+				response_code = (response_code && *(parser->req->buffer + parser->value_start + 1 + response_code) == *(parser->req->buffer + parser->value_start));
+				clear = response_code ? 0 : 1;
+			}
+		}
+		else if (type & BOOL_TYPE_FLAG) {
+			if (parser->value_type == JSON_NULL_VALUE || parser->value_type == JSON_TRUE_VALUE || parser->value_type == JSON_FALSE_VALUE) {
+				((nullable_bool_t*)out)->null = (parser->value_type == JSON_NULL_VALUE) ? NULL_VALUE : NOT_NULL_VALUE;
+				((nullable_bool_t*)out)->value = (parser->value_type == JSON_TRUE_VALUE);
+				response_code = 1;
+				clear = false;
+			}
+			else {
+				response_code = extract_nullable(parser->req->buffer + parser->value_start, (parser->value_close - parser->value_start) + 1, type, out);
+				clear = false;
+			}
+		}
+	}
+
+	if (clear) {
+		extract_nullable(NULL, 0, type, out);
+	}
+
+	return response_code;
+}
+
+#pragma warning( push )
+#pragma warning( disable : 4146 )
+uint8_t ICACHE_FLASH_ATTR extract_nullable(uint8_t* pt, uint16_t len, nullable_type type, void* out) {
+	uint8_t return_code = 0;
+	uint8_t has_value = NULL_VALUE;
+	uint8_t* p = pt;
+	uint8_t c;
+	//----------------------------------
+	// Nulable Int
+	//----------------------------------
+	if (type & INT_TYPE_FLAG || type & DECIMAL_TYPE_FLAG) {
+		uint64_t acc = 0;
+		bool negative = false;
+		// Auto Length
+		len = len ? len : 128;
+
+		if (type & INT_TYPE_FLAG) {
+			if (pt) {
+				if (*pt == 'n' && *(pt + 1) == 'u' && *(pt + 2) == 'l' && *(pt + 3) == 'l') {
+					pt += 3;
+					return_code = 1;
+				}
+				else {
+					c = *pt;
+					if (c == '-') {
+						negative = true;
+						pt++;
+						len--;
+						c = *pt;
+					}
+					else if (c == '+') {
+						pt++;
+						len--;
+						c = *pt;
+					}
+					if (!(c < '0' || c > '9')) has_value = NOT_NULL_VALUE;
+					do {
+						c = *pt;
+						if (c < '0' || c > '9') break;
+						else acc = (acc * 10) + (c - '0');
+					} while (++pt && --len);
+					return_code = (has_value == NOT_NULL_VALUE);
+				}
+			}
+
+
+			// Invalid Sign
+			if (!(type & SIGNED_TYPE_FLAG) && negative) {
+				acc = return_code = 0;
+				has_value = NULL_VALUE;
+			}
+
+
+#ifdef ENABLE__UNION_NULLABLE_TYPE
+			if (type & UNION_NULLABLE_TYPE_FLAG && negative) {
+				//-------------------------------
+				// New Nullable Int Type
+				//-------------------------------
+				if (type & SIGNED_TYPE_FLAG) {
+					if (type == SINT7_TYPE) {
+						((nullable_int7_t*)out)->null = has_value;
+						((nullable_int7_t*)out)->signed_value = (sint8_t)(negative ? -acc : acc);
+					}
+					else if (type == SINT15_TYPE) {
+						((nullable_int15_t*)out)->null = has_value;
+						((nullable_int15_t*)out)->signed_value = (sint16_t)(negative ? -acc : acc);
+					}
+					else if (type == SINT31_TYPE) {
+						((nullable_int31_t*)out)->null = has_value;
+						((nullable_int31_t*)out)->signed_value = (sint32_t)(negative ? -acc : acc);
+					}
+					else if (type == SINT63_TYPE) {
+						((nullable_int63_t*)out)->null = has_value;
+						((nullable_int63_t*)out)->signed_value = (sint64_t)(negative ? -acc : acc);
+					}
+					else if (type == SINT64_TYPE) {
+						((nullable_int64_t*)out)->null = has_value;
+						((nullable_int64_t*)out)->signed_value = (sint64_t)(negative ? -acc : acc);
+					}
+					else {
+						return return_code = 0;
+					}
+				}
+				else {
+					if (type == UINT7_TYPE) {
+						((nullable_int7_t*)out)->null = has_value;
+						((nullable_int7_t*)out)->value = (uint8_t)acc;
+					}
+					else if (type == UINT15_TYPE) {
+						((nullable_int15_t*)out)->null = has_value;
+						((nullable_int15_t*)out)->value = (uint16_t)acc;
+					}
+					else if (type == UINT31_TYPE) {
+						((nullable_int31_t*)out)->null = has_value;
+						((nullable_int31_t*)out)->value = (uint32_t)acc;
+					}
+					else if (type == UINT63_TYPE) {
+						((nullable_int63_t*)out)->null = has_value;
+						((nullable_int63_t*)out)->value = (uint64_t)acc;
+					}
+					else if (type == UINT64_TYPE) {
+						((nullable_int64_t*)out)->null = has_value;
+						((nullable_int64_t*)out)->value = (uint64_t)acc;
+					}
+					else {
+						return return_code = 0;
+					}
+				}
+			}
+			else
+
+#endif
+				//-------------------------------
+				// Legacy Nullable Int Type
+				//-------------------------------
+				if (type & SIGNED_TYPE_FLAG) {
+					if (type == SINT7_TYPE) {
+						((nullable_sint7_t*)out)->null = has_value;
+						((nullable_sint7_t*)out)->value = (sint8_t)(negative ? -acc : acc);
+					}
+					else if (type == SINT15_TYPE) {
+						((nullable_sint15_t*)out)->null = has_value;
+						((nullable_sint15_t*)out)->value = (sint16_t)(negative ? -acc : acc);
+					}
+					else if (type == SINT31_TYPE) {
+						((nullable_sint31_t*)out)->null = has_value;
+						((nullable_sint31_t*)out)->value = (sint32_t)(negative ? -acc : acc);
+					}
+					else if (type == SINT63_TYPE) {
+						((nullable_sint63_t*)out)->null = has_value;
+						((nullable_sint63_t*)out)->value = (negative ? -acc : acc);
+					}
+					else if (type == SINT64_TYPE) {
+						//LOG_CRITICAL("ASSIGN TO SINT64: %c, %d 0x%x", negative ? '-' : '+', acc, acc);
+						((nullable_sint64_t*)out)->null = has_value;
+						((nullable_sint64_t*)out)->value = (negative ? -acc : acc);
+						//LOG_CRITICAL("ASSIGNED TO SINT64: %d", ((nullable_sint64_t*)out)->value);
+					}
+					else {
+						return return_code = 0;
+					}
+				}
+				else {
+					if (type == UINT7_TYPE) {
+						((nullable_uint7_t*)out)->null = has_value;
+						((nullable_uint7_t*)out)->value = (uint8_t)acc;
+					}
+					else if (type == UINT15_TYPE) {
+						((nullable_uint15_t*)out)->null = has_value;
+						((nullable_uint15_t*)out)->value = (uint16_t)acc;
+					}
+					else if (type == UINT31_TYPE) {
+						((nullable_uint31_t*)out)->null = has_value;
+						((nullable_uint31_t*)out)->value = (uint32_t)acc;
+					}
+					else if (type == UINT63_TYPE) {
+						((nullable_uint63_t*)out)->null = has_value;
+						((nullable_uint63_t*)out)->value = (uint64_t)acc;
+					}
+					else if (type == UINT64_TYPE) {
+						//LOG_CRITICAL("ASSIGN TO UINT64: %c, %lu", negative ? '-' : '+', acc);
+						((nullable_uint64_t*)out)->null = has_value;
+						((nullable_uint64_t*)out)->value = (uint64_t)acc;
+					}
+					else {
+						return return_code = 0;
+					}
+				}
+
+		}
+		else if (type & DECIMAL_TYPE_FLAG) {
+			bool post_decimal = false;
+			uint64_t deci_divisor = 1;
+			uint64_t acc2 = 0;
+			if (pt) {
+
+				if (*pt == 'n' && *(pt + 1) == 'u' && *(pt + 2) == 'l' && *(pt + 3) == 'l') {
+					pt += 3;
+					return_code = 1;
+				}
+				else {
+
+					// check sign
+					c = *pt;
+					if (c == '-') {
+						negative = true;
+						pt++;
+						len--;
+					}
+					else if (c == '+') {
+						pt++;
+						len--;
+					}
+
+					// scan whole part.
+					c = *pt;
+					if (!(c < '0' || c > '9')) has_value = NOT_NULL_VALUE;
+					do {
+						c = *pt;
+						if (c == '.') {
+							post_decimal = true;
+						}
+						else if (c < '0' || c > '9') {
+							break;
+						}
+						else {
+							acc = (acc * 10) + (c - '0');
+						}
+					} while (pt++ && len-- && !post_decimal);
+
+					// scan decimal part
+					if (post_decimal) {
+						c = *pt;
+						if (!(c < '0' || c > '9')) has_value = NOT_NULL_VALUE;
+						do {
+							c = *pt;
+							if (c < '0' || c > '9') {
+								break;
+							}
+							else {
+								deci_divisor *= 10;
+								acc2 = (acc2 * 10) + (c - '0');
+							}
+						} while (pt++ && len--);
+					}
+
+					// set return code.
+					return_code = (has_value == NOT_NULL_VALUE);
+				}
+			}
+
+			// Assign		
+			if (type == FLOAT_TYPE) {
+				((nullable_float_t*)out)->null = has_value;
+				((nullable_float_t*)out)->unit_code = 0;
+				((nullable_float_t*)out)->value = (float)((has_value == NOT_NULL_VALUE) ? (negative ? -(acc + (((double)acc2) / ((double)deci_divisor))) : (acc + (((double)acc2) / ((double)deci_divisor)))) : 0);
+			}
+			else if (type == DOUBLE_TYPE) {
+				((nullable_double_t*)out)->null = has_value;
+				((nullable_double_t*)out)->unit_code = 0;
+				((nullable_double_t*)out)->value = (double)((has_value == NOT_NULL_VALUE) ? (negative ? -(acc + (((double)acc2) / ((double)deci_divisor))) : (acc + (((double)acc2) / ((double)deci_divisor)))) : 0);
+			}
+
+
+		}
+	}
+	else if (type & BOOL_TYPE_FLAG) {
+		uint8_t acc = 0;
+		if (pt) {
+			return_code = 1;
+			if (os_strncmp(pt, "null", 4) == 1) acc = 2;
+			else if (os_strncmp(pt, "true", 4) == 0) acc = 1;
+			else if (os_strncmp(pt, "false", 5) == 0) acc = 0;
+			else if (*pt >= '0' && *pt <= '9') {
+				nullable_sint64_t temp = { 0 };
+				return_code = 0;
+				acc = extract_nullable_sint64(pt, &temp);
+				if (acc) {
+					pt += acc;
+					acc = temp.value == 0 ? 0 : 1;
+					return_code = 2;
+				}
+			}
+			else if (*pt == '"' || *pt == '\'') {
+				acc = extract_nullable(pt + 1, len - 1, type, out);
+				if (acc) {
+					// true/false/numeric entry must terminate
+					if (*(pt + 2 + acc) == *pt) return (uint8_t)(pt - p);
+					acc = 0;
+					return_code = 0;
+				}
+			}
+			else return_code = 0;
+			pt += return_code == 1 ? (3 + (acc == 0)) : 0;
+		}
+		((nullable_bool_t*)out)->null = (return_code == 0 || acc == 2) ? NULL_VALUE : NOT_NULL_VALUE;
+		((nullable_bool_t*)out)->value = (acc == 1);
+	}
+	else if (type & TIME_TYPE_FLAG) {
+		if (type == TIME_TYPE) {
+			uint8_t hour = 0;
+			uint8_t minute = 0;
+			if (os_strncmp(pt, "null", 4) == 0) {
+				pt += 3;
+				return_code = 1;
+			}
+			else {
+				if (*pt == '\'' || *pt == '"') pt++;
+
+				// 00:00 or 00|00 or 0:00 or 0|00 accepted (to support set alm and non standard alarm json response from go service). 
+				if ((*pt >= '0' && *pt <= '9')) {
+					uint8_t divider = 0;
+					hour = *pt - '0';
+					pt++;
+
+					if ((*pt >= '0' && *pt <= '9')) {
+						hour = hour * 10 + (*pt - '0');
+						pt++;
+					}
+
+					if (*pt == ':' || *pt == '|') {
+						pt++;
+
+						if ((*pt >= '0' && *pt <= '9') &&
+							(*(pt + 1) >= '0' && *(pt + 1) <= '9')) {
+							has_value = NOT_NULL_VALUE;
+							minute = ((*(pt + 0) - '0') * 10) + (*(pt + 1) - '0');
+							pt += 2;
+							return_code = 1;
+						}
+						else hour = 0; // malformed. 						
+					}
+					else hour = 0; // malformed					
+				}
+			}
+			((nullable_time*)out)->null = has_value;
+			((nullable_time*)out)->hour = hour;
+			((nullable_time*)out)->minute = minute;
+		}
+		else if (type == DATE_TIME_TYPE) {
+			uint8_t p = 0;
+			nullable_sint15_t nv = { 0 };
+			nullable_date_time temp = { 0 };
+			uint8_t r = 1;
+
+			if (*pt == '\'' || *pt == '"') pt++;
+			while (*pt != '\0' && r) {
+				r = extract_nullable_sint15(pt, &nv);
+				if (p == 0) temp.year = nv.value;
+				else if (p == 1) temp.month = (uint8_t)nv.value;
+				else if (p == 2) temp.day = (uint8_t)nv.value;
+				else if (p == 3) temp.hour = (uint8_t)nv.value;
+				else if (p == 4) temp.minute = (uint8_t)nv.value;
+				else if (p == 5) temp.second = (uint8_t)nv.value;
+				else if (p == 6) {
+					if (r == 4) {
+						temp.offset_minute = nv.value % 100;
+						temp.offset_hour = (nv.value - temp.offset_minute) / 100;
+						has_value = NOT_NULL_VALUE;
+						break;
+					}
+					else if (r == 2) temp.offset_hour = (uint8_t)nv.value;
+					else break;
+				}
+				else if (p == 7) temp.offset_minute = (uint8_t)nv.value, has_value == NOT_NULL_VALUE;
+				pt += r;
+
+				// Seperator Check				
+				if (((p == 0 || p == 1) && *pt == '-') || (p == 2 && (*pt == 'T' || *pt == ' ')) || ((p == 3 || p == 4) && *pt == ':') || (p == 6 && *pt == ':')) pt++;
+				else if (p == 5) {
+					if (*pt == '\'' || *pt == '"' || *pt == 'Z') has_value = NOT_NULL_VALUE;
+					// the following will cause required break with smaller code size.
+					if (*pt == '+') temp.offset_sign = 0;
+					else if (*pt == '-') temp.offset_sign = 1;
+					else break;
+					pt++;
+				}
+				else break;
+				p++;
+			};
+
+			if (has_value == NOT_NULL_VALUE) os_memcpy(((nullable_date_time*)out), &temp, sizeof(nullable_date_time));
+			else os_memset(((nullable_date_time*)out), 0, sizeof(nullable_date_time));
+			((nullable_date_time*)out)->null = has_value;
+		}
+
+	}
+
+	return (uint8_t)(return_code ? (pt - p) : 0);
+}
+#pragma warning( pop )
+
+
+
+
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, noizu_trie_a* trie, nullable_token_t* out) {
 	out->null = NULL_VALUE;
 	out->value = 0;
@@ -1117,7 +1533,8 @@ uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, noizu
 		uint8_t index = 1;
 		uint8_t len = parser->value_close - parser->value_start;
 		// Note value starts at the opening quote and ends at the closing quote. 
-		for (uint8_t i = 1; i < len; i++) {
+		uint8_t i = 0;
+		for (i = 1; i < len; i++) {
 			index = noizu_trie_a_advance(*(parser->req->buffer + parser->value_start + i), index, trie);
 		}
 		if (trie[index][TRIE_A_TOKEN]) {
@@ -1130,469 +1547,296 @@ uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, noizu
 }
 
 uint8_t ICACHE_FLASH_ATTR json_parser__extract_key(json_parser* parser, nullable_string_t* out) {
-	if (out->value) {
-		os_free(out->value);
-		out->value = NULL;
-	}
+	if (out == NULL) return FALSE;
 	out->null = NULL_VALUE;
-
-	if (parser->value_type == JSON_NULL_VALUE) {
-		return 1;
-	}
-
 	if (parser->key_close > parser->key_start) {
 		uint16_t s = parser->key_start;
 		uint16_t len = parser->key_close - parser->key_start;
-		if (*(parser->req->buffer + s) == '"' || *(parser->req->buffer + s) == '\'') {
-			len--;
-			s++;
-		}
-		else {
-			len++;
-		}
-		if (len >= 0) {
-			out->value = (uint8_t*)os_zalloc(len + 1);
-			if (out->value) {
-				if (len) {
-					os_memcpy(out->value, (parser->req->buffer + s), len);
-					out->null = NOT_NULL_VALUE;
-					return 1;
-				}
-			}
-		}
+		if (*(parser->req->buffer + s) == '"' || *(parser->req->buffer + s) == '\'') len--, s++;
+		else len++;
+
+		if (len) return strncpy_nullable_string(out, parser->req->buffer + s, len) ? TRUE : FALSE;
 	}
-	return 0;
+	return FALSE;
 }
 
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_bool(json_parser* parser, nullable_bool_t* out) {
-	out->null = NULL_VALUE;
-	out->value = 0;
-	if (parser->value_type == JSON_NULL_VALUE) return 1;
-	if (parser->value_type == JSON_TRUE_VALUE || parser->value_type == JSON_FALSE_VALUE) {
-		out->null = NOT_NULL_VALUE;
-		out->value = parser->value_type == JSON_TRUE_VALUE ? 1 : 0;
-		return 1;
-	}
-	return 0;
-}
+/*
+		if (!out->is_pointer) out->string = os_zalloc(sizeof(nullable_string_t));
+		if (out->string && json_parser__extract_string(parser, out->string)) {
+			out->null = out->string->null;
+			out->is_pointer = true;
+		}
+		else if (out->string) {
+			free_nullable_string(&out->string, TRUE);
+			out->string = NULL;
+			out->variant = ERROR_VARIANT;
+		}
+		else out->variant = ERROR_VARIANT;
+		*/
+
+
+
 
 uint8_t ICACHE_FLASH_ATTR json_parser__extract_string(json_parser* parser, nullable_string_t* out) {
-	if (out->value) {
-		os_free(out->value);
-		out->value = NULL;
+	if (out == NULL) return FALSE;
+	out->null = NULL_VALUE;
+	if (parser->value_type == JSON_NULL_VALUE) {
+		if (out->value) *out->value = '\0';
+		return TRUE;
 	}
+	else if (parser->value_close > parser->value_start && (parser->value_type == JSON_DOUBLE_QUOTE_VALUE || parser->value_type == JSON_QUOTE_VALUE)) {
+		if ((parser->value_close - parser->value_start - 1) == 0) {
+			allocate_nullable_string(out, 1);
+			out->null = NOT_NULL_VALUE;
+			return TRUE;
+		}
+		else {
+			return strncpy_nullable_string(out, parser->req->buffer + parser->value_start + 1, (parser->value_close - parser->value_start - 1));
+		}
+	}
+	return FALSE;
+}
+
+
+
+uint8_t ICACHE_FLASH_ATTR json_parser__extract_date_time(json_parser* parser, nullable_date_time* out) {
+	if (parser == NULL || out == NULL) return 0;
+	os_memset(out, 0, sizeof(nullable_date_time));
 	out->null = NULL_VALUE;
 
+	if (parser->value_type == JSON_NULL_VALUE) return 1;
+	else if (parser->value_type == JSON_DOUBLE_QUOTE_VALUE || parser->value_close == JSON_QUOTE_VALUE) {
+		uint8_t* pt = parser->req->buffer + parser->value_start;
+		return extract_nullable_date_time(pt, out) ? 1 : 0;
+	}
+	return 0;
+}
+
+
+uint8_t ICACHE_FLASH_ATTR json_parser__extract_time(json_parser* parser, nullable_time* out) {
+	if (parser == NULL || out == NULL) return 0;
+	out->null = NULL_VALUE;
+	out->hour = 0;
+	out->minute = 0;
 	if (parser->value_type == JSON_NULL_VALUE) {
 		return 1;
 	}
+	else if (parser->value_type == JSON_DOUBLE_QUOTE_VALUE || parser->value_close == JSON_QUOTE_VALUE) {
+		uint8_t* pt = parser->req->buffer + parser->value_start;
+		return extract_nullable_time(pt, out) ? 1 : 0;
+	}
+	return 0;
+}
 
-	if (parser->value_close > parser->value_start && (parser->value_type == JSON_DOUBLE_QUOTE_VALUE || parser->value_type == JSON_QUOTE_VALUE)) {
-		uint16_t len = parser->value_close - parser->value_start - 1;
-		out->value = (uint8_t*)os_zalloc(len + 1);
-		if (out->value) {
-			if (len) {
-				os_memcpy(out->value, (parser->req->buffer + parser->value_start + 1), len);
-				out->null = NOT_NULL_VALUE;
-				return 1;
-			}
+
+/*!
+ * Very basic reference counter dealloc of allocated string.
+ */
+uint8_t ICACHE_FLASH_ATTR free_nullable_string(nullable_string_t** v, uint8_t option_flag) {
+	if (v == NULL || *v == NULL) {
+		//LOG_CRITICAL("FREE N.S. NULL");
+		return FALSE;
+	}
+	uint8_t r = 0;
+
+	// Reduce Reference as we are freeing our pointer (regardless of whether or not we actually modify the inner contents)
+
+	//LOG_CRITICAL("FREE N.S (%d:%d), %s", (*v)->counter, option_flag, (*v)->value);
+
+	if ((*v)->counter) (*v)->counter--;
+
+	if (option_flag & FREE_LOCKED) r |= FREE_LOCKED;
+	else if (((*v)->counter == 0) && (option_flag & (FREE_CONTENTS | FREE_STRUCT | FORCE_FREE_CONTENTS | FORCE_FREE_STRUCT | RELEASE_STRUCT))) r |= FREE_CONTENTS;
+	else if (option_flag & FORCE_FREE_CONTENTS) r |= (FORCE_FREE_CONTENTS | FREE_CONTENTS);
+
+
+
+	// Purge Contents if requested (with exception for locked pointers)
+	if (r & FREE_CONTENTS) {
+		// if free lock is set we must not free the underlying pointer as it may be pointed to memory that will be double freed or is otherwise nonfreeable or reserved. 
+		if ((*v)->free_lock) r |= FREE_LOCKED;
+
+		if ((*v)->free_lock) {
+		}
+
+		// Skip free operation if free locked, simply remove this specific reference to the pointer.
+		if ((r & FREE_LOCKED)) {
+			//LOG_CRITICAL("FREE LOCK %s", (*v)->value);
+			(*v)->value = NULL;
+		}
+		else if ((*v)->value) {
+			//LOG_CRITICAL("FREE STR %s", (*v)->value);
+			os_free((*v)->value);
+			(*v)->null = NULL_VALUE;
+			(*v)->value = NULL;
+		}
+		(*v)->free_lock = FALSE;
+		(*v)->allocated = 0;
+	}
+
+	// Unlink and Purge Structure if requested.
+	// always dealloc if FORCE_FREE_STRUCT or if we were the last reference and caller has requested FREE or RELEASE.
+	if ((option_flag & FREE_LOCKED)) {
+		if ((*v)->counter == 0 && (option_flag & FREE_STRUCT)) r |= RELEASE_STRUCT;
+		else if (option_flag & (FORCE_FREE_STRUCT | RELEASE_STRUCT)) r |= RELEASE_STRUCT;
+	}
+	else {
+		if ((*v)->counter == 0 && (option_flag & (FREE_STRUCT | FORCE_FREE_STRUCT | RELEASE_STRUCT))) r |= (FREE_STRUCT | RELEASE_STRUCT);
+		else if (option_flag & FORCE_FREE_STRUCT) r |= (FORCE_FREE_STRUCT | FREE_STRUCT | RELEASE_STRUCT);
+		else if (option_flag & RELEASE_STRUCT) r |= RELEASE_STRUCT;
+	}
+
+	if (r & FREE_STRUCT) {
+		if ((*v)->counter) {
+			//LOG_CRITICAL("FREE N.S (%d:%d), %s", (*v)->counter, option_flag, (*v)->value);
+			LOG_ERROR("Free Has Ref");
+		}
+		os_free(*v);
+		*v = NULL;
+	}
+	else if (r & RELEASE_STRUCT) {
+		//LOG_CRITICAL("RELEASE STRUCT ONLY");
+		*v = NULL;
+	}
+	//else {
+		//LOG_CRITICAL("UNCAUGHT");
+	//}
+
+	// Return code (includes information on actions taken).
+	return r;
+}
+
+/*!
+ * Free inner string if allocated and counter fully dereferenced.
+ */
+uint8_t ICACHE_FLASH_ATTR free_nullable_string_contents(nullable_string_t* v) {
+	return free_nullable_string(&v, FREE_CONTENTS);
+}
+
+uint8_t ICACHE_FLASH_ATTR strncpy_nullable_string(nullable_string_t* v, uint8_t* source, uint16_t length) {
+	if (v == NULL) return FALSE;
+	if (source == NULL) return FALSE;
+
+	if (length == 0) length = (uint16_t)os_strlen(source);
+	if (allocate_nullable_string(v, length + 1)) {
+		if (length) {
+			os_strncpy(v->value, source, length);
+		}
+		v->null = NOT_NULL_VALUE;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+uint8_t ICACHE_FLASH_ATTR allocate_nullable_string(nullable_string_t* v, uint16_t size) {
+	if (v) {
+		v->null = NULL_VALUE;
+		if (size == 0) {
+			return TRUE;
+		}
+		else if (size <= v->allocated && v->value && (v->allocated - size) < MAXIMUM_NULLABLE_STRING_OVER_ALLOCATION) {
+			// No need to realloc as existing buffer is sufficient and not excessively over allocated.
+			os_memset(v->value, '\0', size); // only zero specified size to reduce operations;
+			*(v->value + (v->allocated - 1)) = '\0'; // zero last element as failsafe to avoid string over runs. 
+		}
+		else {
+			// increment ref counter on initial allocation.
+			if (v->counter == 0) v->counter = 1;
+			// if (v->value == NULL) v->counter++;
+
+			// We must realloc as existing buffer too small or excessively large. 									
+			v->allocated = 0;
+			if (!v->free_lock && v->value) os_free(v->value);
+			v->value = NULL;
+
+			// Ensure minimum size allocated (this reduces need for frequent reallocation).
+			// if size is smaller than minimum threshold use minimum threshold.
+			// if size is almost default size but slightly smaller simply use default size instead.
+			if (size < MINIMUM_NULLABLE_STRING_SIZE) size = MINIMUM_NULLABLE_STRING_SIZE;
+			else if (size < DEFAULT_NULLABLE_STRING_SIZE && (DEFAULT_NULLABLE_STRING_SIZE - size) <= NULLABLE_STRING_UPSIZE_CUTOFF) size = DEFAULT_NULLABLE_STRING_SIZE;
+
+			// Allocate
+
+			// We can't set the true allocation due to bin types. 
+			v->value = os_zalloc(size);
+			if (v->value) v->allocated = size;
 		}
 	}
-	return 0;
+	return (v && v->value) ? TRUE : FALSE;
 }
 
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint7(json_parser* parser, nullable_sint7_t* out) {
-	nullable_sint64_t i = { .null = NULL_VALUE,.value = 0 };
-	if (json_parser__extract_sint64(parser, &i)) {
-		out->null = i.null;
-		out->value = (sint8_t)i.value;
-		return 1;
+uint8_t ICACHE_FLASH_ATTR recycle_nullable_string(nullable_string_t** v, uint16_t size) {
+	if (v == NULL) return FALSE;
+	if ((*v)->counter > 1) {
+		// nullable_string has other references, decrement counter and clear pointer so we may allocate a new entry.
+		(*v)->counter--;
+		*v = os_zalloc(sizeof(nullable_string_t));
+		if (*v == NULL) return FALSE;
 	}
-	return 0;
+	(*v)->counter = 1;
+	return allocate_nullable_string(*v, size);
 }
 
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint15(json_parser* parser, nullable_sint15_t* out) {
-	nullable_sint64_t i = { .null = NULL_VALUE,.value = 0 };
-	if (json_parser__extract_sint64(parser, &i)) {
-		out->null = i.null;
-		out->value = (sint16_t) i.value;
-		return 1;
-	}
-	return 0;
-}
-
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint31(json_parser* parser, nullable_sint31_t* out) {
-	nullable_sint64_t i = { .null = NULL_VALUE,.value = 0 };
-	if (json_parser__extract_sint64(parser, &i)) {
-		out->null = i.null;
-		out->value = (sint32_t) i.value;
-		return 1;
-	}
-	return 0;
-}
-
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint63(json_parser* parser, nullable_sint63_t* out) {
-	nullable_sint64_t i = { .null = NULL_VALUE,.value = 0 };
-	if (json_parser__extract_sint64(parser, &i)) {
-		out->null = i.null;
-		out->value = i.value;
-		return 1;
-	}
-	return 0;
-}
-
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_sint64(json_parser* parser, nullable_sint64_t* out) {
-	if (parser->value_type == JSON_NULL_VALUE) {
-		out->null = NULL_VALUE;
-		out->value = 0;
-		return 1;
-	}
-	else if (parser->value_type == JSON_NUMERIC_VALUE) {
-		if (parser->value_close && parser->value_close >= parser->value_start) {
-			uint8_t* pt = parser->req->buffer + parser->value_start;
-			uint8_t len = (parser->value_close - parser->value_start) + 1;
-			bool negative = false;
-			bool has_value = false;
-			int32_t acc = 0;
-			uint8_t c = *pt;
-			if (c == '-') {
-				negative = true;
-				pt++;
-				len--;
-				c = *pt;
-			}
-			else if (c == '+') {
-				pt++;
-				len--;
-				c = *pt;
-			}
-			if (!(c < '0' || c > '9')) has_value = true;
-			do {
-				c = *pt;
-				if (c < '0' || c > '9') break;
-				else acc = (acc * 10) + (c - '0');
-			} while (++pt && --len);
-			out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
-			out->value = negative ? -acc : acc;
-			return 1;
+nullable_string_t* ICACHE_FLASH_ATTR copy_nullable_string(nullable_string_t* v) {
+	if (v) v->counter++;
+	else {
+		v = os_zalloc(sizeof(nullable_string_t));
+		if (v) {
+			v->counter = 1;
+			allocate_nullable_string(v, DEFAULT_NULLABLE_STRING_SIZE);
 		}
 	}
-	return 0;
-}
-
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint7(json_parser* parser, nullable_uint7_t* out) {
-	nullable_uint64_t i = { .null = NULL_VALUE,.value = 0 };
-	if (json_parser__extract_uint64(parser, &i)) {
-		out->null = i.null;
-		out->value = (uint8_t) i.value;
-		return 1;
-	}
-	return 0;
-}
-
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint15(json_parser* parser, nullable_uint15_t* out) {
-	nullable_uint64_t i = { .null = NULL_VALUE,.value = 0 };
-	if (json_parser__extract_uint64(parser, &i)) {
-		out->null = i.null;
-		out->value = (uint16_t) i.value;
-		return 1;
-	}
-	return 0;
-}
-
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint31(json_parser* parser, nullable_uint31_t* out) {
-	nullable_uint64_t i = { .null = NULL_VALUE,.value = 0 };
-	if (json_parser__extract_uint64(parser, &i)) {
-		out->null = i.null;
-		out->value = (uint32_t) i.value;
-		return 1;
-	}
-	return 0;
-}
-
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_uint63(json_parser* parser, nullable_uint63_t* out) {
-	nullable_uint64_t i = { .null = NULL_VALUE,.value = 0 };
-	if (json_parser__extract_uint64(parser, &i)) {
-		out->null = i.null;
-		out->value = i.value;
-		return 1;
-	}
-	return 0;
-}
-
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_uint64(json_parser* parser, nullable_uint64_t* out) {
-	if (parser->value_type == JSON_NULL_VALUE) {
-		out->null = NULL_VALUE;
-		out->value = 0;
-		return 1;
-	}
-	else if (parser->value_type == JSON_NUMERIC_VALUE) {
-		if (parser->value_close && parser->value_close >= parser->value_start) {
-			uint8_t* pt = parser->req->buffer + parser->value_start;
-			uint8_t len = (parser->value_close - parser->value_start) + 1;
-			bool has_value = false;
-			uint32_t acc = 0;
-			uint8_t c = *pt;
-			if (c == '-') return 0;
-			else if (c == '+') pt++, len--;
-			if (!(c < '0' || c > '9')) has_value = true;
-			do {
-				c = *pt;
-				if (c < '0' || c > '9') break;
-				else acc = (acc * 10) + (c - '0');
-			} while (++pt && --len);
-			out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
-			out->value = acc;
-			return 1;
-		}
-	}
-	return 0;
+	return v;
 }
 
 
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_float(json_parser* parser, nullable_float_t* out) {
-	nullable_double_t v = { .null = NULL_VALUE,.value = 0.0 };
-	if (json_parser__extract_double(parser, &v)) {
-		out->null = v.null;
-		out->value = (float)v.value;
+noizu_realloc_code resize_dynamic_array(dynamic_array* raw, uint16_t entry_size, uint16_t required_length, uint16_t max_size, uint16_t increment, post_resize_cb cb) {
+	uint16_t new_size;
+	void* resize;
+	if (raw == NULL) return NOZ_DYNAMIC_ARRAY__ARG_ERROR;
+	if (max_size && max_size < required_length) return NOZ_DYNAMIC_ARRAY__OVERFLOW;
+	if (required_length <= raw->allocated) return NOZ_DYNAMIC_ARRAY__OK_ALLOCATED;
+	increment = increment ? increment : 5;
+	new_size = raw->allocated;
+	while (new_size <= required_length) new_size += increment;
+	if (max_size && new_size > max_size) new_size = max_size;
+
+	uint32_t al = (entry_size * (new_size + 1));
+	resize = os_zalloc(al);
+	if (resize == NULL) {
+		return NOZ_DYNAMIC_ARRAY__ALLOC_FAIL;
+	}
+
+	if (raw->raw_array) {
+		os_memcpy(resize, raw->raw_array, raw->size * entry_size);
+	}
+	os_free(raw->raw_array);
+	raw->raw_array = resize;
+	noizu_realloc_code r = NOZ_DYNAMIC_ARRAY__OK_RESIZED;
+	if (cb) {
+		r = cb(raw, new_size);
+	}
+	else {
+		raw->allocated = new_size;
+	}
+	return r;
+}
+
+uint8_t ICACHE_FLASH_ATTR extract_nullable_token(uint8_t* buffer, noizu_trie_a* trie, nullable_token_t* out) {
+	uint8_t index = 1;
+	while (*buffer != '\0' && index != 0) {
+		index = noizu_trie_a_advance(*buffer, index, trie);
+	}
+	if (trie[index][TRIE_A_TOKEN]) {
+		out->null = NOT_NULL_VALUE;
+		out->value = trie[index][TRIE_A_TOKEN];
 		return 1;
 	}
 	else {
-		return 0;
-	}
-}
-
-uint8_t ICACHE_FLASH_ATTR json_parser__extract_double(json_parser* parser, nullable_double_t* out) {
-	if (parser->value_type == JSON_NULL_VALUE) {
 		out->null = NULL_VALUE;
 		out->value = 0;
-		return 1;
-	}
-	else if (parser->value_type == JSON_NUMERIC_VALUE) {
-		if (parser->value_close && parser->value_close >= parser->value_start) {
-			uint8_t* pt = (parser->req->buffer + parser->value_start);
-			uint8_t len = (parser->value_close - parser->value_start) + 1;
-			bool negative = false;
-			bool decimal = false;
-			bool has_value = false;
-			double acc = 0;
-			double acc_d = 0;
-			double dps = 1;
-			uint8_t c = *pt;
-			if (c == '-') negative = true, pt++, len--;
-			else if (c == '+') pt++, len--;
-			if (!(c < '0' || c > '9')) has_value = true;
-			do {
-				c = *pt;
-				//LOG_ERROR("C = %c\n", c);
-
-				if (c == '.') {
-					if (decimal) return 0;
-					else decimal = true;
-				}
-				else if (c < '0' || c > '9') {
-					break;
-				}
-				else {
-					if (decimal) {
-						dps *= 10;
-						acc_d = (acc_d * 10) + (c - '0');
-					}
-					else {
-						acc = (acc * 10) + (c - '0');
-					}
-				}
-			} while (++pt && --len);
-			out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
-			out->value = negative ? -(acc + (acc_d / dps)) : (acc + (acc_d / dps));
-			return 1;
-		}
-	}
-	return 0;
-}
-
-/*!
- * @brief parser a nullable_double_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR extract_nullable_double(uint8_t* pt, nullable_double_t* out) {
-	bool negative = false;
-	bool has_value = false;
-	bool post_decimal = false;
-
-	int32_t acc = 0;
-	int32_t deci_divisor = 1;
-	int32_t acc2 = 0;
-	uint8_t* p = pt;
-	if (*pt == '-') negative = true, pt++;
-	else if (*pt == '+') pt++;
-	if (!(*pt < '0' || *pt > '9')) has_value = true;
-	do {
-		if (*pt == '.') {
-			pt++;
-			break;
-		}
-		if (*pt < '0' || *pt > '9') break;
-		acc = (acc * 10) + (*pt - '0');
-	} while (pt++);
-
-	do {
-		if (*pt < '0' || *pt > '9') break;
-		else deci_divisor *= 10, acc2 = (acc2 * 10) + (*pt - '0');
-	} while (pt++);
-
-
-	out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
-	if (has_value) {
-		out->value = acc;
-		out->value += (((double)acc2) / ((double)deci_divisor));
-		if (negative) out->value = -out->value;
-		return (uint8_t)(pt - p);
-	}
-	else {
-		out->value = (double)0.0f;
 		return 0;
 	}
 }
-
-/*!
- * @brief parser a nullable_float_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR extract_nullable_float(uint8_t* parser, nullable_float_t* out) {
-	nullable_double_t v = { .null = NULL_VALUE,.value = 0.0 };
-	uint8_t r = extract_nullable_double(parser, &v);
-	out->value = (float)v.value;
-	out->null = v.null;
-	return r;
-}
-
-
-/*!
- * @brief parser a nullable_sint64_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR extract_nullable_sint64(uint8_t* pt, nullable_sint64_t* out) {
-	bool negative = false;
-	bool has_value = false;
-	int32_t acc = 0;
-	uint8_t* p = 0;
-	if (*pt == '-') negative = true, pt++;
-	else if (*pt == '+') pt++;
-	if (!(*pt < '0' || *pt > '9')) has_value = true;
-	do {
-		if (*pt < '0' || *pt > '9') break;
-		else acc = (acc * 10) + (*pt - '0');
-	} while (pt++);
-	out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
-	out->value = negative ? -acc : acc;
-	return has_value ? (uint8_t)(pt - p) : 0;
-}
-
-/*!
- * @brief parser a nullable_sint63_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR  extract_nullable_sint63(uint8_t* parser, nullable_sint63_t* out) {
-	nullable_sint64_t v = { .null = NULL_VALUE,.value = 0 };
-	uint8_t r = extract_nullable_sint64(parser, &v);
-	out->value = (sint64_t)v.value;
-	out->null = v.null;
-	return r;
-}
-
-/*!
- * @brief parser a nullable_sint31_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR  extract_nullable_sint31(uint8_t* parser, nullable_sint31_t* out) {
-	nullable_sint64_t v = { .null = NULL_VALUE,.value = 0 };
-	uint8_t r = extract_nullable_sint64(parser, &v);
-	out->value = (sint32_t)v.value;
-	out->null = v.null;
-	return r;
-}
-
-/*!
- * @brief parser a nullable_sint15_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR  extract_nullable_sint15(uint8_t* parser, nullable_sint15_t* out) {
-	nullable_sint64_t v = { .null = NULL_VALUE,.value = 0 };
-	uint8_t r = extract_nullable_sint64(parser, &v);
-	out->value = (sint16_t)v.value;
-	out->null = v.null;
-	return r;
-}
-
-/*!
- * @brief parser a nullable_sint7_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR  extract_nullable_sint7(uint8_t* parser, nullable_sint7_t* out) {
-	nullable_sint64_t v = { .null = NULL_VALUE,.value = 0 };
-	uint8_t r = extract_nullable_sint64(parser, &v);
-	out->value = (sint8_t)v.value;
-	out->null = v.null;
-	return r;
-}
-
-/*!
- * @brief parser a nullable_uint64_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR extract_nullable_uint64(uint8_t* pt, nullable_uint64_t* out) {
-	bool negative = false;
-	bool has_value = false;
-	int32_t acc = 0;
-	uint8_t *p = pt;
-	if (*pt == '-') negative = true, pt++;
-	else if (*pt == '+') pt++;
-	if (!(*pt < '0' || *pt > '9')) has_value = true;
-	do {
-		if (*pt < '0' || *pt > '9') break;
-		else acc = (acc * 10) + (*pt - '0');
-	} while (pt++);
-	out->null = has_value ? NOT_NULL_VALUE : NULL_VALUE;
-	out->value = negative ? -acc : acc;
-	return has_value ? (uint8_t)(pt - p) : 0;
-}
-
-/*!
- * @brief parser a nullable_uint63_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint63(uint8_t* parser, nullable_uint63_t* out) {
-	nullable_uint64_t v = { .null = NULL_VALUE,.value = 0 };
-	uint8_t r = extract_nullable_uint64(parser, &v);
-	out->value = (uint64_t)v.value;
-	out->null = v.null;
-	return r;
-}
-
-/*!
- * @brief parser a nullable_uint31_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint31(uint8_t* parser, nullable_uint31_t* out) {
-	nullable_uint64_t v = { .null = NULL_VALUE,.value = 0 };
-	uint8_t r = extract_nullable_uint64(parser, &v);
-	out->value = (uint32_t)v.value;
-	out->null = v.null;
-	return r;
-}
-
-/*!
- * @brief parser a nullable_uint15_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint15(uint8_t* parser, nullable_uint15_t* out) {
-	nullable_uint64_t v = { .null = NULL_VALUE,.value = 0 };
-	uint8_t r = extract_nullable_uint64(parser, &v);
-	out->value = (uint16_t)v.value;
-	out->null = v.null;
-	return r;
-}
-
-/*!
- * @brief parser a nullable_uint7_t from buffer
- */
-uint8_t ICACHE_FLASH_ATTR  extract_nullable_uint7(uint8_t* parser, nullable_uint7_t* out) {
-	nullable_uint64_t v = { .null = NULL_VALUE,.value = 0 };
-	uint8_t r = extract_nullable_uint64(parser, &v);
-	out->value = (uint8_t)v.value;
-	out->null = v.null;
-	return r;
-}
-
 
 #pragma warning(pop)
