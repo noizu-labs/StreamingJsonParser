@@ -21,5 +21,8 @@ TEST_GROUP_RUNNER(StreamingParser)
 	RUN_TEST_CASE(StreamingParser, UnitTest_ExtractNullableDoubleAsInt);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ExtractNullableDoubleAsNegativeFloat);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ExtractNullableDoubleAsNegativeInt);
+
+
+	RUN_TEST_CASE(StreamingParser, UnitTest_BufferEnd);
 }
 

@@ -362,6 +362,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__PARSE_KEY(json_parser* parser) 
 	// if did not terminate at end of input advance buffer to end of unknown key.
 	if (parser->trie_state->terminator != parser->trie_state->options.delimiter) {
 		if (o == TRIE_BUFFER_END) {
+			parser->req->buffer_pos = parser->trie_state->req_position;
 			return PS_END_OF_BUFFER;
 		}
 		else {

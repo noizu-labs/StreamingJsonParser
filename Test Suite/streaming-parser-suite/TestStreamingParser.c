@@ -694,3 +694,36 @@ TEST(StreamingParser, UnitTest_ExtractNullableDoubleAsNegativeInt)
 	TEST_ASSERT_EQUAL(sut.null, NOT_NULL_VALUE);
 	TEST_ASSERT_EQUAL(sut.value, -951);
 }
+
+
+TEST(StreamingParser, UnitTest_BufferEnd)
+{
+
+	uint8_t json[] = "{'enabled': 1, \"featur";
+	uint8_t json2[] = "ed\": 2, fields: 3, options: {apple: 1, bannana: 2, one: 5, wee: {contents: 4, empty: {}, list: [1,2,3,4,{three: 1234}, {}]}}, two: 6}";
+	req->buffer = os_zalloc(512);
+	os_strncpy(req->buffer, json, os_strlen(json));
+	req->buffer_size = ((uint32_t)os_strlen(json));
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test5_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+	os_strncpy(req->buffer + req->buffer_size , json2, os_strlen(json2));
+	req->buffer_size += os_strlen(json2) + 1;
+	json_streaming_parser(parser);
+
+	TEST_ASSERT_EQUAL(out->enabled.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->enabled.value, 1);
+	TEST_ASSERT_EQUAL(out->featured.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->featured.value, 2);
+	TEST_ASSERT_EQUAL(out->fields.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->fields.value, 3);
+	TEST_ASSERT_EQUAL(out->one.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->one.value, 5);
+	TEST_ASSERT_EQUAL(out->two.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->two.value, 6);
+	TEST_ASSERT_EQUAL(out->contents.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->contents.value, 4);
+	TEST_ASSERT_EQUAL(out->three.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->three.value, 1234);
+}
