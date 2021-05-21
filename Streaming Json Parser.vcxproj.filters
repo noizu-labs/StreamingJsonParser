@@ -37,13 +37,19 @@
     <Filter Include="Test Suite\StreamingParser\support">
       <UniqueIdentifier>{fbbbcfdf-a256-4df8-b7cc-f6898ff0b885}</UniqueIdentifier>
     </Filter>
+    <Filter Include="import\noizu_trie\trie_array">
+      <UniqueIdentifier>{6a825acc-42af-4207-9b96-f87a50ce6e5e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="import\noizu_trie\trie_compact">
+      <UniqueIdentifier>{d2d977bd-a8b8-4813-a7ad-6ddaec6c2bd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="import\noizu_trie\trie_struct">
+      <UniqueIdentifier>{0bef4689-f982-445e-9419-a77b812b4b3a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="streaming-parser.h">
       <Filter>import</Filter>
-    </ClInclude>
-    <ClInclude Include="noizu_trie\noizu_trie_a.h">
-      <Filter>import\noizu_trie</Filter>
     </ClInclude>
     <ClInclude Include="Unity\src\unity.h">
       <Filter>Unity</Filter>
@@ -63,6 +69,18 @@
     <ClInclude Include="Test Suite\streaming-parser-suite\support\array_trie.h">
       <Filter>Test Suite\StreamingParser\support</Filter>
     </ClInclude>
+    <ClInclude Include="noizu_trie\trie_array\noizu_trie_a.h">
+      <Filter>import\noizu_trie\trie_array</Filter>
+    </ClInclude>
+    <ClInclude Include="noizu_trie\trie_compact\noizu_trie_c.h">
+      <Filter>import\noizu_trie\trie_compact</Filter>
+    </ClInclude>
+    <ClInclude Include="noizu_trie\trie_struct\noizu_trie_s.h">
+      <Filter>import\noizu_trie\trie_struct</Filter>
+    </ClInclude>
+    <ClInclude Include="noizu_trie\noizu_trie.h">
+      <Filter>import\noizu_trie</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -70,12 +88,6 @@
     </ClCompile>
     <ClCompile Include="streaming-parser.c">
       <Filter>import</Filter>
-    </ClCompile>
-    <ClCompile Include="noizu_trie\noizu_trie_a.c">
-      <Filter>import\noizu_trie</Filter>
-    </ClCompile>
-    <ClCompile Include="streaming-parser-suite.c">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Unity\src\unity.c">
       <Filter>Unity</Filter>
@@ -97,6 +109,18 @@
     </ClCompile>
     <ClCompile Include="Test Suite\streaming-parser-suite\support\array_trie.c">
       <Filter>Test Suite\StreamingParser\support</Filter>
+    </ClCompile>
+    <ClCompile Include="noizu_trie\trie_array\noizu_trie_a.c">
+      <Filter>import\noizu_trie\trie_array</Filter>
+    </ClCompile>
+    <ClCompile Include="noizu_trie\trie_compact\noizu_trie_c.c">
+      <Filter>import\noizu_trie\trie_compact</Filter>
+    </ClCompile>
+    <ClCompile Include="noizu_trie\trie_struct\noizu_trie_s.c">
+      <Filter>import\noizu_trie\trie_struct</Filter>
+    </ClCompile>
+    <ClCompile Include="noizu_trie\noitu_trie.c">
+      <Filter>import\noizu_trie</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

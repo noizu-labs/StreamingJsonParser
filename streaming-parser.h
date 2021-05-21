@@ -8,7 +8,9 @@
 
 #ifndef __STREAMING_PARSER_H__ 
 #define __STREAMING_PARSER_H__
-#include "noizu_trie_a.h"
+
+
+#include "noizu_trie.h"
 
 #ifndef NSP_DBG_ENABLED
 #define NSP_DBG_ENABLED FALSE
@@ -26,86 +28,9 @@
 #define NULLABLE_STRING_UPSIZE_CUTOFF 5
 #endif 
 
-
 #ifndef MINIMUM_NULLABLE_STRING_SIZE
 #define MINIMUM_NULLABLE_STRING_SIZE 5
 #endif 
-
- //------------------------------
- // Override some defines used for ESP8266 for cross compatibility
- //------------------------------
-#ifdef GENERIC_MODE
-#include <stdio.h>
-
-#ifdef UNITY_TEST
-#include "unity_memory.h"
-#else
-#include <corecrt_malloc.h>
-#endif
-
-#include <string.h>
-
-#define ICACHE_FLASH_ATTR
-typedef unsigned char       uint8_t;
-typedef signed char         sint8_t;
-typedef signed char         int8_t;
-typedef unsigned short      uint16_t;
-typedef signed short        sint16_t;
-typedef signed short        int16_t;
-typedef unsigned int        uint32_t;
-typedef signed int          sint32_t;
-typedef signed int          int32_t;
-typedef signed long long    sint64_t;
-typedef unsigned long long  uint64_t;
-typedef unsigned long long  u_int64_t;
-
-typedef unsigned char   bool;
-#define BOOL            bool
-#define true            (1)
-#define false           (0)
-#define TRUE            true
-#define FALSE           false
-
-typedef struct offset_buffer {
-	uint8_t* buffer; // Current buffer, (may be reallocated between calls).
-	uint32_t buffer_size; // Total length of buffer from buffer_pos to end of new data.
-	uint32_t allocated_buffer; // Total space allocated for buffer.
-	uint32_t buffer_pos; // Current starting position in buffer.
-} offset_buffer;
-
-#define os_sprintf sprintf
-#define os_printf printf
-#define os_printf_plus printf
-
-#define LOG_ERROR(format, ...) os_printf("[LOG ERROR]@%s:%d: " format "\r\n", __func__, __LINE__, ##__VA_ARGS__);
-#define LOG_WARN(format, ...) os_printf("[LOG WARN]@%s:%d: " format "\r\n", __func__, __LINE__, ##__VA_ARGS__);
-
-#define os_free free
-#define os_malloc malloc
-#define os_calloc(s) calloc(s, 1)
-#define os_realloc realloc
-#define os_zalloc(s) calloc(s, 1)
-
-#define os_memcmp memcmp
-#define os_memcpy memcpy
-#define os_memmove memmove
-#define os_memset memset
-#define os_strcat strcat
-#define os_strchr strchr
-#define os_strcmp strcmp
-#define os_strcpy strcpy
-#define os_strlen strlen
-#define os_strncmp strncmp
-#define os_strncpy strncpy
-#define os_strstr strstr
-#else
-#include "osapi.h"
-#include "c_types.h"
-#include "mem.h"
-#include "ip_addr.h"
-#include "httpc.h"
-typedef request_args_t offset_buffer;
-#endif
 
 typedef uint8_t noizu_realloc_code;
 #define NOZ_DYNAMIC_ARRAY__ARG_ERROR 0x01
@@ -414,8 +339,8 @@ typedef struct nullable_token_t {
 } nullable_token_t;
 #else 
 typedef struct nullable_token_t {
-	TRIE_A_UNIT value : TRIE_A_UNIT_BITS;
-	uint8_t null : NULLABLE_TOKEN_BITS;
+	uint8_t value : 8;
+	uint8_t null : 1;
 } nullable_token_t;
 #endif
 #else 
@@ -622,11 +547,10 @@ typedef jsp_cb_command(*json_streaming_parser_event_cb)(json_parse_state state, 
  *
  */
 typedef struct json_parser {
-	// Token
-	noizu_trie_a* trie;
-	TRIE_A_UNIT trie_index;
-	TRIE_A_UNIT token;
-	TRIE_A_UNIT parent;
+	struct noizu_trie_state* trie_state;
+	struct noizu_trie_definition* trie_definition;
+	TRIE_TOKEN token;
+	TRIE_TOKEN parent;
 
 	// Parsing
 	json_parse_state parse_state;
@@ -698,7 +622,10 @@ void ICACHE_FLASH_ATTR shift_json_parser(uint16_t shift, json_parser* parser);
 void ICACHE_FLASH_ATTR free_json_parser(json_parser* base, BOOL free_pointer);
 json_parser* ICACHE_FLASH_ATTR spawn_json_parser(json_parser* parser);
 json_parser* ICACHE_FLASH_ATTR drop_json_parser(json_parser* parser);
-json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer*, noizu_trie_a* trie, json_streaming_parser_event_cb cb, void* output);
+json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer* req, struct noizu_trie_options options, struct noizu_trie_definition* definition, json_streaming_parser_event_cb cb, void* output);
+
+
+
 json_parser* ICACHE_FLASH_ATTR top_parser(json_parser* parser);
 
 // Debug Output
@@ -713,7 +640,7 @@ void ICACHE_FLASH_ATTR print_json_parser(json_parser* parser, uint8_t offset);
 
 
 // Parsing Helpers
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, noizu_trie_a* trie, nullable_token_t* out);
+uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, struct noizu_trie_state* state, struct noizu_trie_definition* definition, nullable_token_t* out);
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_key(json_parser* parser, nullable_string_t* out);
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_string(json_parser* parser, nullable_string_t* out);
 
@@ -766,8 +693,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_date_time(json_parser* parser, nu
 #define extract_nullable_time(pt, out) extract_nullable((pt), 0, TIME_TYPE, (void*)(out))
 #define extract_nullable_date_time(pt, out) extract_nullable((pt), 0, DATE_TIME_TYPE, (void*)(out))
 
-uint8_t ICACHE_FLASH_ATTR extract_nullable_token(uint8_t* buffer, noizu_trie_a* trie, nullable_token_t* out);
-
+uint8_t ICACHE_FLASH_ATTR extract_nullable_token(struct noizu_trie_state* state, struct noizu_trie_definition* definition, nullable_token_t* out);
 
 //------------------------------------------
 // Nullable String Helpers

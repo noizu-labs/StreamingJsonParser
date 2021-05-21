@@ -73,7 +73,7 @@
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)/noizu_trie;</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)/;$(ProjectDir)/noizu_trie;$(ProjectDir)/Unity/src/;$(ProjectDir)/Unity/extras/fixture/src;$(ProjectDir)/Unity/extras/memory/src</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)/;$(ProjectDir)/noizu_trie;$(ProjectDir)/noizu_trie/trie_array;$(ProjectDir)/noizu_trie/trie_compact;$(ProjectDir)/noizu_trie/trie_struct;$(ProjectDir)/Unity/src/;$(ProjectDir)/Unity/extras/fixture/src;$(ProjectDir)/Unity/extras/memory/src;</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -135,7 +135,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="noizu_trie\noizu_trie_a.h" />
+    <ClInclude Include="noizu_trie\noizu_trie.h" />
+    <ClInclude Include="noizu_trie\trie_array\noizu_trie_a.h" />
+    <ClInclude Include="noizu_trie\trie_compact\noizu_trie_c.h" />
+    <ClInclude Include="noizu_trie\trie_struct\noizu_trie_s.h" />
     <ClInclude Include="streaming-parser.h" />
     <ClInclude Include="Test Suite\streaming-parser-suite\support\array_trie.h" />
     <ClInclude Include="Unity\extras\fixture\src\unity_fixture.h" />
@@ -146,8 +149,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c" />
-    <ClCompile Include="noizu_trie\noizu_trie_a.c" />
-    <ClCompile Include="streaming-parser-suite.c" />
+    <ClCompile Include="noizu_trie\noitu_trie.c" />
+    <ClCompile Include="noizu_trie\trie_array\noizu_trie_a.c" />
+    <ClCompile Include="noizu_trie\trie_compact\noizu_trie_c.c" />
+    <ClCompile Include="noizu_trie\trie_struct\noizu_trie_s.c" />
     <ClCompile Include="streaming-parser.c" />
     <ClCompile Include="Test Suite\streaming-parser-suite\support\array_trie.c" />
     <ClCompile Include="Test Suite\TestStreamingParser_Runner.c" />

@@ -1,7 +1,8 @@
 
 #include "array_trie.h"
+#include "noizu_trie_a.h"
 
-noizu_trie_a _a_trie[] = {
+const noizu_trie_a __internal_array_test_trie_arr[] = {
 	{0, 0, 0, 0},
 	{'*', 0, 2, 0},
 	{'c', 3, 71, 0},
@@ -82,7 +83,24 @@ noizu_trie_a _a_trie[] = {
 	{'s', 0, 0, JK_CONTENTS}
 };
 
+struct noizu_trie__array__definition __internal_array_test_trie_inner_def = {
+    .trie = (const noizu_trie_a*)__internal_array_test_trie_arr,
+    .trie_length = 98,
+};
+
+
+
+struct noizu_trie_definition array_test_trie = {
+    .constant = 1,
+    .type = TRIE_ARRAY_TYPE,
+    .type_definition = &__internal_array_test_trie_inner_def,
+    .trie_init = noizu_trie__array__init,
+    .trie_free = noizu_trie__array__free,
+    .trie_validate = noizu_trie__array__validate,
+    .trie_advance = noizu_trie__array__advance,
+    .trie_tokenize = NULL
+};
 
 noizu_trie_a* a_trie() {
-	return _a_trie;
+	return __internal_array_test_trie_arr;
 }

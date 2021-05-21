@@ -3,7 +3,10 @@
 #include "unity_fixture.h"
 #include "support/array_trie.h"
 
+
 TEST_GROUP(StreamingParser);
+
+extern struct noizu_trie_definition array_test_trie;
 
 struct test_output {
 	nullable_bool_t bool_test;
@@ -88,7 +91,8 @@ jsp_cb_command test3_cb(json_parse_state state, json_parser* parser) {
 		if (parser->depth == 1) {
 			if (parser->parent_p->value_type == JSON_LIST_VALUE) {
 				int index = parser->list_index;
-				json_parser__extract_token(parser, a_trie(), &out->token_array_test[index]);
+				json_parser__extract_token(parser, parser->trie_state, parser->trie_definition, &out->token_array_test[index]);
+				
 			}
 		}
 	}
@@ -354,7 +358,8 @@ TEST(StreamingParser, UnitTest_ParseNestedStruct) {
 	uint8_t json[] = "{'enabled': 1, \"featured\": 2, fields: 3, \"inner\": {\"inner\": {apple: 1, bannana: 2, one: 5, wee: {contents: 4, empty: {}, list: [1,2,3,4,{three: 1234}, {}]}}}, two: 6}";
 	req->buffer = json;
 	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
-	json_parser* parser = init_json_parser(req, a_trie(), test4b_cb, out);
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test4b_cb, out);
 	parser->parse_state = PS_ADVANCE_VALUE;
 	json_streaming_parser(parser);
 
@@ -386,7 +391,8 @@ TEST(StreamingParser, UnitTest_ParseBoolTrue)
 	uint8_t json[] = "true";
 	req->buffer = json;
 	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
-	json_parser* parser = init_json_parser(req, a_trie(), test_cb, out);
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test_cb, out);
 	parser->parse_state = PS_ADVANCE_VALUE;
 	json_streaming_parser(parser);
 	TEST_ASSERT_EQUAL(out->bool_test.null, NOT_NULL_VALUE);
@@ -403,7 +409,8 @@ TEST(StreamingParser, UnitTest_ParseBoolFalse)
 	uint8_t json[] = "false";
 	req->buffer = json;
 	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
-	json_parser* parser = init_json_parser(req, a_trie(), test_cb, out);
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test_cb, out);
 	parser->parse_state = PS_ADVANCE_VALUE;
 	json_streaming_parser(parser);
 	TEST_ASSERT_EQUAL(out->bool_test.null, NOT_NULL_VALUE);
@@ -421,7 +428,8 @@ TEST(StreamingParser, UnitTest_ParseArray)
 	uint8_t json[] = "[-54321,4321,-321,null,-1,-0]";
 	req->buffer = json;
 	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
-	json_parser* parser = init_json_parser(req, a_trie(), test_cb, out);
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test_cb, out);
 	parser->parse_state = PS_ADVANCE_VALUE;
 	json_streaming_parser(parser);
 
@@ -449,7 +457,8 @@ TEST(StreamingParser, UnitTest_ParseStringArray)
 	uint8_t json[] = "['Aaa',      null, 'BbB', \"CcC\", 123,null]";
 	req->buffer = json;
 	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
-	json_parser* parser = init_json_parser(req, a_trie(), test2_cb, out);
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test2_cb, out);
 	parser->parse_state = PS_ADVANCE_VALUE;
 	json_streaming_parser(parser);
 
@@ -479,7 +488,8 @@ TEST(StreamingParser, UnitTest_ParseTokenArray)
 	uint8_t json[] = "['Rubbage', null, 'degrees_celsius', 'relative_humidity', 1234]";
 	req->buffer = json;
 	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
-	json_parser* parser = init_json_parser(req, a_trie(), test3_cb, out);
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test3_cb, out);
 	parser->parse_state = PS_ADVANCE_VALUE;
 	json_streaming_parser(parser);
 
@@ -505,7 +515,8 @@ TEST(StreamingParser, UnitTest_ParseStruct)
 	uint8_t json[] = "{'enabled': 1, \"featured\": 2, fields: 3, inner: {apple: 1, bannana: 2, one: 5, wee: {contents: 4, empty: {}, list: [1,2,3,4,{three: 1234}, {}]}}, two: 6}";
 	req->buffer = json;
 	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
-	json_parser* parser = init_json_parser(req, a_trie(), test4_cb, out);
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test4_cb, out);
 	parser->parse_state = PS_ADVANCE_VALUE;
 	json_streaming_parser(parser);
 
@@ -532,7 +543,8 @@ TEST(StreamingParser, UnitTest_ParseStructHandlerSwitch)
 	uint8_t json[] = "{'enabled': 1, \"featured\": 2, fields: 3, options: {apple: 1, bannana: 2, one: 5, wee: {contents: 4, empty: {}, list: [1,2,3,4,{three: 1234}, {}]}}, two: 6}";
 	req->buffer = json;
 	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
-	json_parser* parser = init_json_parser(req, a_trie(), test5_cb, out);
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test5_cb, out);
 	parser->parse_state = PS_ADVANCE_VALUE;
 	json_streaming_parser(parser);
 

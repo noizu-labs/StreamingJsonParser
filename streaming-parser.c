@@ -32,13 +32,11 @@ void ICACHE_FLASH_ATTR reset_json_parser(json_parser* parser);
 void ICACHE_FLASH_ATTR shift_json_parser(uint16_t shift, json_parser* parser);
 json_parser* ICACHE_FLASH_ATTR spawn_json_parser(json_parser* parser);
 json_parser* ICACHE_FLASH_ATTR drop_json_parser(json_parser* parser);
-json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer*, noizu_trie_a* trie, json_streaming_parser_event_cb cb, void* output);
 json_parser* ICACHE_FLASH_ATTR top_parser(json_parser* parser);
 
 //--------------------------------
 // Declarations: Parsing Helpers
 //--------------------------------
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, noizu_trie_a* trie, nullable_token_t* out);
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_key(json_parser* parser, nullable_string_t* out);
 uint8_t ICACHE_FLASH_ATTR  json_parser__extract_string(json_parser* parser, nullable_string_t* out);
 
@@ -290,20 +288,28 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_KEY(json_parser* parser
 			parser->char_skip = 1;
 			parser->key_start = parser->req->buffer_pos;
 			parser->token = 0;
-			parser->trie_index = 1;
 			parser->parse_state = PS_PARSE_KEY;
 			parser->in_d_quote = 1;
 			parser->d_quote_track = 1;
+
+			// reset
+			noizu_trie__init(parser->req, parser->trie_definition, parser->trie_state->options, parser->trie_state);
+			parser->trie_state->options.delimiter = '"';
+			
 			return parser->parse_state;
 
 		case '\'':
 			parser->char_skip = 1;
 			parser->key_start = parser->req->buffer_pos;
 			parser->token = 0;
-			parser->trie_index = 1;
 			parser->parse_state = PS_PARSE_KEY;
 			parser->in_s_quote = 1;
 			parser->s_quote_track = 1;
+
+			// reset
+			noizu_trie__init(parser->req, parser->trie_definition, parser->trie_state->options, parser->trie_state);
+			parser->trie_state->options.delimiter = '\'';
+			
 			return parser->parse_state;
 
 
@@ -319,11 +325,14 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_KEY(json_parser* parser
 
 		default:
 			if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
-				parser->char_skip = 1;
+				parser->char_skip = 0;
 				parser->key_start = parser->req->buffer_pos;
 				parser->token = 0;
-				parser->trie_index = 1;
-				parser->trie_index = noizu_trie_a_advance(*(p + parser->req->buffer_pos), parser->trie_index, parser->trie);
+
+				// reset
+				noizu_trie__init(parser->req, parser->trie_definition, parser->trie_state->options, parser->trie_state);
+				parser->trie_state->options.delimiter = ':';
+
 				parser->parse_state = PS_PARSE_KEY;
 				return parser->parse_state;
 			}
@@ -342,103 +351,98 @@ json_parse_state ICACHE_FLASH_ATTR json_process__PARSE_KEY(json_parser* parser) 
 	uint8_t* p = parser->req->buffer;
 	uint8_t s = 0;
 	uint8_t c;
-	for (; (parser->req->buffer_pos + 1) < parser->req->buffer_size; parser->req->buffer_pos++) {
-		c = *(p + parser->req->buffer_pos);
 
-		if (parser->escape_char) {
-			parser->escape_char = 0;
-			switch (c) {
-			case '\\':
-				parser->trie_index = noizu_trie_a_advance('\\', parser->trie_index, parser->trie);
-				break;
-			case 'n':
-				parser->trie_index = noizu_trie_a_advance('\n', parser->trie_index, parser->trie);
-				break;
-			case 'r':
-				parser->trie_index = noizu_trie_a_advance('\r', parser->trie_index, parser->trie);
-				break;
-			case 't':
-				parser->trie_index = noizu_trie_a_advance('\t', parser->trie_index, parser->trie);
-				break;
-			case '"':
-				parser->trie_index = noizu_trie_a_advance('"', parser->trie_index, parser->trie);
-				break;
-			case '\'':
-				parser->trie_index = noizu_trie_a_advance('\'', parser->trie_index, parser->trie);
-				break;
-			default:
-				LOG_ERROR("[JSON] Unsupported escape %c", *(p + parser->req->buffer_pos));
-			}
+	//-------- @TODO ---------------------------------------
+	// tokenize, on failure forward to end of string
+	// tokenize, on success confirm terminator 
+	parser->trie_state->req_position = parser->req->buffer_pos;
+
+	TRIE_TOKEN o = noizu_trie__tokenize(parser->trie_state, parser->trie_definition, 0);
+	
+	// if did not terminate at end of input advance buffer to end of unknown key.
+	if (parser->trie_state->terminator != parser->trie_state->options.delimiter) {
+		if (o == TRIE_BUFFER_END) {
+			return PS_END_OF_BUFFER;
 		}
 		else {
-			switch (c) {
-			case '\\':
-				parser->escape_char = 1;
-				break;
-			case '"':
-				if (!parser->in_s_quote) {
-					s = 1;
-					parser->char_skip = 1;
-					parser->key_close = parser->req->buffer_pos;
-				}
-				break;
-			case '\'':
-				if (!parser->in_d_quote) {
-					s = 1;
-					parser->char_skip = 1;
-					parser->key_close = parser->req->buffer_pos;
-				}
-				break;
+			
+			for (; (parser->req->buffer_pos + 1) < parser->req->buffer_size; parser->req->buffer_pos++) {
+				c = *(p + parser->req->buffer_pos);
 
-			default:
-				if (!(parser->in_d_quote || parser->in_s_quote)) {
-					if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-						s = 1;
-						parser->char_skip = 0;
-						if (parser->req->buffer_pos) {
-							parser->key_close = parser->req->buffer_pos - 1;
-						}
-						else {
-							// unexpected state
-							LOG_ERROR("INVALID_STATE");
+				if (parser->escape_char) {
+					parser->escape_char = 0;
+				}
+				else {
+					switch (c) {
+					case '\\':
+						parser->escape_char = 1;
+						break;
+					case '"':
+						if (!parser->in_s_quote) {
+							s = 1;
+							parser->char_skip = 1;
 							parser->key_close = parser->req->buffer_pos;
+						}
+						break;
+					case '\'':
+						if (!parser->in_d_quote) {
+							s = 1;
+							parser->char_skip = 1;
+							parser->key_close = parser->req->buffer_pos;
+						}
+						break;
+
+					default:
+						if (!(parser->in_d_quote || parser->in_s_quote)) {
+							if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
+								s = 1;
+								parser->char_skip = 0;
+								if (parser->req->buffer_pos) {
+									parser->key_close = parser->req->buffer_pos - 1;
+								}
+								else {
+									// unexpected state
+									LOG_ERROR("INVALID_STATE");
+									parser->key_close = parser->req->buffer_pos;
+								}
+							}
 						}
 					}
 				}
-			}
-
-			if (s) {
-				parser->escape_char = 0;
-				parser->in_d_quote = 0;
-				parser->in_s_quote = 0;
-				parser->s_quote_track = 0;
-				parser->d_quote_track = 0;
-				parser->token = parser->trie[parser->trie_index][3];
-				parser->parse_state = PS_ADVANCE_VALUE;
-				return PS_PARSE_KEY_COMPLETE;
-			}
-			if (!parser->escape_char) parser->trie_index = noizu_trie_a_advance(c, parser->trie_index, parser->trie);
-		}
-
-		/*
-				//LOG_ERROR("INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));
-				if (*(p + parser->req->buffer_pos) != '"') {
-					//LOG_ERROR("INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));
-					//LOG_ERROR("TRIE INDEX = %d, %s", parser->trie_index, parser->trie == NULL ? "NULL" : "OK");
-					parser->trie_index = noizu_trie_a_advance(*(p + parser->req->buffer_pos), parser->trie_index, parser->trie);
-				} else {
-					//LOG_ERROR("INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));
-
+				if (s) {
+					parser->escape_char = 0;
+					parser->in_d_quote = 0;
+					parser->in_s_quote = 0;
+					parser->s_quote_track = 0;
+					parser->d_quote_track = 0;
+					parser->parse_state = PS_ADVANCE_VALUE;
+					return PS_PARSE_KEY_COMPLETE;
 				}
-				//LOG_ERROR("INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));
-				*/
+			}
+
+			// walked to end of buffer
+			if (parser->req->buffer_pos && (parser->req->buffer_pos == parser->req->buffer_size)) {
+				parser->req->buffer_pos--;
+			}
+			return PS_END_OF_BUFFER;
+		}
 	}
-	//LOG_ERROR("INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));
-	if (parser->req->buffer_pos && (parser->req->buffer_pos == parser->req->buffer_size)) {
-		//LOG_ERROR("INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));
-		parser->req->buffer_pos--;
-	}
-	return PS_END_OF_BUFFER;
+	else {
+		parser->req->buffer_pos = parser->trie_state->req_position;
+		parser->key_close = parser->trie_state->req_position;
+		if (parser->in_d_quote || parser->in_s_quote) {
+			parser->key_close--;
+			parser->char_skip = 1;
+		}
+		parser->escape_char = 0;
+		parser->in_d_quote = 0;
+		parser->in_s_quote = 0;
+		parser->s_quote_track = 0;
+		parser->d_quote_track = 0;
+		parser->token = parser->trie_state->token;
+		parser->parse_state = PS_ADVANCE_VALUE;
+		return PS_PARSE_KEY_COMPLETE;
+	}	
 }
 
 json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_VALUE(json_parser* parser) {
@@ -783,7 +787,12 @@ void ICACHE_FLASH_ATTR  ICACHE_FLASH_ATTR reset_json_parser(json_parser* parser)
 	uint16_t pt = parser->parent;
 	//uint16_t list_entries = parser->list_index;
 	uint8_t skip = parser->char_skip;
-	noizu_trie_a* trie = parser->trie;
+	
+	// deprecated
+	struct noizu_trie_state* state = parser->trie_state;
+	struct noizu_trie_definition* definition = parser->trie_definition;
+
+
 	uint8_t depth = parser->depth;
 	void* output = parser->output;
 	json_value_type vt = parser->value_type;
@@ -797,11 +806,11 @@ void ICACHE_FLASH_ATTR  ICACHE_FLASH_ATTR reset_json_parser(json_parser* parser)
 
 	parser->previous_value_type = vt;
 	parser->cb = cb;
-	parser->trie = trie;
+	parser->trie_state = state;
+	parser->trie_definition = definition;
 	parser->output = output;
 	parser->active = 1;
 	parser->char_skip = skip;
-	parser->trie_index = 1;
 	parser->child = c;
 	parser->parent_p = p;
 	parser->parent = (uint8_t)pt;
@@ -868,9 +877,13 @@ void ICACHE_FLASH_ATTR free_json_parser(json_parser* base, BOOL free_pointer) {
 			break;
 		}
 	}
-	if (free_pointer) {
+	if (free_pointer) {		
 		json_parser_globals_reset();
-		if (base) os_free(base);
+		if (base) {
+			// note must only be invoked on top level parser or we will double free state/definition.
+			noizu_trie__free(base->trie_state, base->trie_definition, TRIE_FREE_DEFINITION || TRIE_FREE_STATE);
+			os_free(base);
+		}
 	}
 }
 
@@ -888,7 +901,7 @@ json_parser* ICACHE_FLASH_ATTR spawn_json_parser(json_parser* parser) {
 	}
 	else {
 		//LOG_ERROR("[JSON] Spawn new child");
-		parser->child = init_json_parser(parser->req, parser->trie, parser->cb, parser->output);
+		parser->child = init_json_parser(parser->req, parser->trie_state->options, parser->trie_definition, parser->cb, parser->output);
 		parser->child->depth = parser->depth + 1;
 		parser->child->parent_p = parser;
 		if (parser->value_type == JSON_LIST_VALUE) {
@@ -955,18 +968,25 @@ json_parser* ICACHE_FLASH_ATTR drop_json_parser(json_parser* parser) {
 	}
 }
 
-json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer* req, noizu_trie_a* trie, json_streaming_parser_event_cb cb, void* output) {
+json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer* req, struct noizu_trie_options options, struct noizu_trie_definition* definition, json_streaming_parser_event_cb cb, void* output) {
 	json_parser* r = (json_parser*)os_zalloc(sizeof(json_parser));
-	if (r) {
-		r->cb = cb;
-		r->output = output;
-		r->req = req;
-		r->trie = trie;
-		r->trie_index = 1;
-		r->parse_state = PS_ADVANCE_KEY;
-		r->value_type = JSON_ERROR_VALUE;
-		r->active = 1;
-		return r;
+	if (r) {		
+		r->trie_state = os_zalloc(sizeof(struct noizu_trie_state));
+		if (r->trie_state) {
+			noizu_trie__init(req, definition, options, r->trie_state);
+			r->trie_definition = definition;
+
+			r->cb = cb;
+			r->output = output;
+			r->req = req;
+			r->parse_state = PS_ADVANCE_KEY;
+			r->value_type = JSON_ERROR_VALUE;
+			r->active = 1;
+			return r;
+		}
+		else {
+			os_free(r);
+		}
 	}
 	return NULL;
 }
@@ -1091,7 +1111,7 @@ void ICACHE_FLASH_ATTR print_json_parser(json_parser* parser, uint8_t offset) {
 	}
 	os_printf("\n");
 
-	os_printf("%s| trie %d, token %d, parent %d, [...]\n", prefix, parser->trie_index, parser->token, parser->parent);
+	os_printf("%s| trie %d, token %d, parent %d, [...]\n", prefix, 0, parser->token, parser->parent);
 	os_printf("%s| key_start = %06d, key_close = %06d\n", prefix, parser->key_start, parser->key_close);
 	os_printf("%s| val_start = %06d, val_close = %06d\n", prefix, parser->value_start, parser->value_close);
 	os_printf("%s| Eratta:\n", prefix);
@@ -1525,8 +1545,7 @@ uint8_t ICACHE_FLASH_ATTR extract_nullable(uint8_t* pt, uint16_t len, nullable_t
 
 
 
-
-uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, noizu_trie_a* trie, nullable_token_t* out) {
+uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, struct noizu_trie_state* state, struct noizu_trie_definition* definition, nullable_token_t* out) {
 	out->null = NULL_VALUE;
 	out->value = 0;
 	if (parser->value_close > parser->value_start && (parser->value_type == JSON_DOUBLE_QUOTE_VALUE || parser->value_type == JSON_QUOTE_VALUE)) {
@@ -1534,17 +1553,19 @@ uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, noizu
 		uint8_t len = parser->value_close - parser->value_start;
 		// Note value starts at the opening quote and ends at the closing quote. 
 		uint8_t i = 0;
-		for (i = 1; i < len; i++) {
-			index = noizu_trie_a_advance(*(parser->req->buffer + parser->value_start + i), index, trie);
-		}
-		if (trie[index][TRIE_A_TOKEN]) {
+		// reset not init
+		noizu_trie__init(parser->req, parser->trie_definition, parser->trie_state->options, parser->trie_state);
+		state->req_position = parser->value_start + 1;
+		TRIE_TOKEN o = noizu_trie__tokenize(state, definition, NULL);
+		if (state->req_position == (parser->value_start + len) && !(o & TRIE_ERROR) && state->token) {
 			out->null = NOT_NULL_VALUE;
-			out->value = trie[index][TRIE_A_TOKEN];
+			out->value = state->token;
 			return 1;
 		}
 	}
 	return 0;
 }
+
 
 uint8_t ICACHE_FLASH_ATTR json_parser__extract_key(json_parser* parser, nullable_string_t* out) {
 	if (out == NULL) return FALSE;
@@ -1822,14 +1843,11 @@ noizu_realloc_code resize_dynamic_array(dynamic_array* raw, uint16_t entry_size,
 	return r;
 }
 
-uint8_t ICACHE_FLASH_ATTR extract_nullable_token(uint8_t* buffer, noizu_trie_a* trie, nullable_token_t* out) {
-	uint8_t index = 1;
-	while (*buffer != '\0' && index != 0) {
-		index = noizu_trie_a_advance(*buffer, index, trie);
-	}
-	if (trie[index][TRIE_A_TOKEN]) {
+uint8_t ICACHE_FLASH_ATTR extract_nullable_token(struct noizu_trie_state* state, struct noizu_trie_definition* definition, nullable_token_t* out) {
+	TRIE_TOKEN o = noizu_trie__tokenize(state, definition, NULL);
+	if (state->terminator == '\0' && !(o & TRIE_ERROR) &&  state->token) {
 		out->null = NOT_NULL_VALUE;
-		out->value = trie[index][TRIE_A_TOKEN];
+		out->value = state->token;
 		return 1;
 	}
 	else {
@@ -1838,5 +1856,4 @@ uint8_t ICACHE_FLASH_ATTR extract_nullable_token(uint8_t* buffer, noizu_trie_a* 
 		return 0;
 	}
 }
-
 #pragma warning(pop)
