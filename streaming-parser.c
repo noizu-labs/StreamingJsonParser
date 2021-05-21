@@ -280,7 +280,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process(json_parser* parser) {
 json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_KEY(json_parser* parser) {
 	uint8_t* p = parser->req->buffer;
 	uint8_t c = 0;
-	for (; (parser->req->buffer_pos + 1) < parser->req->buffer_size; parser->req->buffer_pos++) {
+	for (; (parser->req->buffer_pos) < parser->req->buffer_size; parser->req->buffer_pos++) {
 		//LOG_ERROR("INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));		
 		c = *(p + parser->req->buffer_pos);
 		switch (c) {
@@ -295,7 +295,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_KEY(json_parser* parser
 			// reset
 			noizu_trie__reset(parser->trie_definition, parser->trie_state->options, parser->trie_state);
 			parser->trie_state->options.delimiter = '"';
-			
+
 			return parser->parse_state;
 
 		case '\'':
@@ -309,7 +309,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_KEY(json_parser* parser
 			// reset
 			noizu_trie__reset(parser->trie_definition, parser->trie_state->options, parser->trie_state);
 			parser->trie_state->options.delimiter = '\'';
-			
+
 			return parser->parse_state;
 
 
@@ -358,7 +358,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__PARSE_KEY(json_parser* parser) 
 	parser->trie_state->req_position = parser->req->buffer_pos;
 
 	TRIE_TOKEN o = noizu_trie__tokenize(parser->trie_state, parser->trie_definition, 0);
-	
+
 	// if did not terminate at end of input advance buffer to end of unknown key.
 	if (parser->trie_state->terminator != parser->trie_state->options.delimiter) {
 		if (o == TRIE_BUFFER_END) {
@@ -366,8 +366,8 @@ json_parse_state ICACHE_FLASH_ATTR json_process__PARSE_KEY(json_parser* parser) 
 			return PS_END_OF_BUFFER;
 		}
 		else {
-			
-			for (; (parser->req->buffer_pos + 1) < parser->req->buffer_size; parser->req->buffer_pos++) {
+
+			for (; (parser->req->buffer_pos) < parser->req->buffer_size; parser->req->buffer_pos++) {
 				c = *(p + parser->req->buffer_pos);
 
 				if (parser->escape_char) {
@@ -432,7 +432,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__PARSE_KEY(json_parser* parser) 
 		parser->req->buffer_pos = parser->trie_state->req_position;
 		parser->key_close = parser->trie_state->req_position;
 		if (parser->in_d_quote || parser->in_s_quote) {
-			parser->key_close--;
+			//parser->key_close--;
 			parser->char_skip = 1;
 		}
 		parser->escape_char = 0;
@@ -443,12 +443,12 @@ json_parse_state ICACHE_FLASH_ATTR json_process__PARSE_KEY(json_parser* parser) 
 		parser->token = parser->trie_state->token;
 		parser->parse_state = PS_ADVANCE_VALUE;
 		return PS_PARSE_KEY_COMPLETE;
-	}	
+	}
 }
 
 json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_VALUE(json_parser* parser) {
 	uint8_t* p = parser->req->buffer;
-	for (; (parser->req->buffer_pos + 1) < parser->req->buffer_size; parser->req->buffer_pos++) {
+	for (; (parser->req->buffer_pos) < parser->req->buffer_size; parser->req->buffer_pos++) {
 		//LOG_ERROR("[JSON] INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));
 		// Advance until we encounter a '{', null, true, false, '[', '"', '\''
 		uint8_t c = *(p + parser->req->buffer_pos);
@@ -556,7 +556,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__CAPTURE_VALUE(json_parser* pars
 	uint8_t* p = parser->req->buffer;
 	uint8_t list_member = (parser->parent_p && parser->parent_p->value_type == JSON_LIST_VALUE);
 
-	for (; (parser->req->buffer_pos + 1) < parser->req->buffer_size; parser->req->buffer_pos++) {
+	for (; (parser->req->buffer_pos) < parser->req->buffer_size; parser->req->buffer_pos++) {
 		//LOG_ERROR("INSIDE LOOP %d:%d, [%c] - '%s'", parser->req->buffer_pos, parser->req->buffer_size, *(p + parser->req->buffer_pos), (p + parser->req->buffer_pos));
 		uint8_t c = *(p + parser->req->buffer_pos);
 		switch (c) {
@@ -790,7 +790,7 @@ void ICACHE_FLASH_ATTR  ICACHE_FLASH_ATTR reset_json_parser(json_parser* parser)
 	uint16_t pt = parser->parent;
 	//uint16_t list_entries = parser->list_index;
 	uint8_t skip = parser->char_skip;
-	
+
 	// deprecated
 	struct noizu_trie_state* state = parser->trie_state;
 	struct noizu_trie_definition* definition = parser->trie_definition;
@@ -880,7 +880,7 @@ void ICACHE_FLASH_ATTR free_json_parser(json_parser* base, BOOL free_pointer) {
 			break;
 		}
 	}
-	if (free_pointer) {		
+	if (free_pointer) {
 		json_parser_globals_reset();
 		if (base) {
 			// note must only be invoked on top level parser or we will double free state/definition.
@@ -973,7 +973,7 @@ json_parser* ICACHE_FLASH_ATTR drop_json_parser(json_parser* parser) {
 
 json_parser* ICACHE_FLASH_ATTR init_json_parser(offset_buffer* req, struct noizu_trie_options options, struct noizu_trie_definition* definition, json_streaming_parser_event_cb cb, void* output) {
 	json_parser* r = (json_parser*)os_zalloc(sizeof(json_parser));
-	if (r) {		
+	if (r) {
 		r->trie_state = os_zalloc(sizeof(struct noizu_trie_state));
 		if (r->trie_state) {
 			noizu_trie__init(req, definition, options, r->trie_state);
@@ -1577,7 +1577,7 @@ uint8_t ICACHE_FLASH_ATTR json_parser__extract_key(json_parser* parser, nullable
 		uint16_t s = parser->key_start;
 		uint16_t len = parser->key_close - parser->key_start;
 		if (*(parser->req->buffer + s) == '"' || *(parser->req->buffer + s) == '\'') len--, s++;
-		else len++;
+		//else len++;
 
 		if (len) return strncpy_nullable_string(out, parser->req->buffer + s, len) ? TRUE : FALSE;
 	}
@@ -1848,7 +1848,7 @@ noizu_realloc_code resize_dynamic_array(dynamic_array* raw, uint16_t entry_size,
 
 uint8_t ICACHE_FLASH_ATTR extract_nullable_token(struct noizu_trie_state* state, struct noizu_trie_definition* definition, nullable_token_t* out) {
 	TRIE_TOKEN o = noizu_trie__tokenize(state, definition, NULL);
-	if (state->terminator == '\0' && !(o & TRIE_ERROR) &&  state->token) {
+	if (state->terminator == '\0' && !(o & TRIE_ERROR) && state->token) {
 		out->null = NOT_NULL_VALUE;
 		out->value = state->token;
 		return 1;
