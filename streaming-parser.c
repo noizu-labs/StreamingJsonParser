@@ -653,6 +653,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__CAPTURE_VALUE(json_parser* pars
 					return PS_COMPLETE;
 				}
 			}
+			break;
 
 		case JSON_NULL_VALUE:
 			if (c == 'l') {
@@ -671,6 +672,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__CAPTURE_VALUE(json_parser* pars
 					}
 				}
 				else {
+					parser->char_skip = 1;
 					parser->null_track = 1;
 				}
 			}
