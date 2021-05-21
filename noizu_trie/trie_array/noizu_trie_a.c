@@ -32,6 +32,10 @@ TRIE_A_UNIT noizu_trie_a_advance(char key, TRIE_A_UNIT current_node, noizu_trie_
 }
 
 
+TRIE_TOKEN noizu_trie__array__reset(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out) {
+	noizu_trie__array__init(NULL, definition, options, out);
+}
+
 TRIE_TOKEN noizu_trie__array__init(offset_buffer* req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out) {
 	if (out->type_state && out->type && out->type != TRIE_ARRAY_TYPE) return TRIE_ARGUMENT_ERROR__INVALID_TYPE_STATE;
 	out->type = TRIE_ARRAY_TYPE;

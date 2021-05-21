@@ -24,6 +24,10 @@ TRIE_S_UNIT noizu_trie_s_advance(char k, TRIE_S_UNIT current_node, noizu_trie_s*
 	return TRIE_NOT_FOUND;
 }
 
+TRIE_TOKEN noizu_trie__struct__reset(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out) {
+	noizu_trie__struct__init(NULL, definition, options, out);
+}
+
 TRIE_TOKEN noizu_trie__struct__init(offset_buffer* req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out) {
 	if (out->type_state && out->type && out->type != TRIE_STRUCT_TYPE) return TRIE_ARGUMENT_ERROR__INVALID_TYPE_STATE;
 	out->type = TRIE_STRUCT_TYPE;

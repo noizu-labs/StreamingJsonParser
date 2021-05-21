@@ -293,7 +293,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_KEY(json_parser* parser
 			parser->d_quote_track = 1;
 
 			// reset
-			noizu_trie__init(parser->req, parser->trie_definition, parser->trie_state->options, parser->trie_state);
+			noizu_trie__reset(parser->trie_definition, parser->trie_state->options, parser->trie_state);
 			parser->trie_state->options.delimiter = '"';
 			
 			return parser->parse_state;
@@ -307,7 +307,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_KEY(json_parser* parser
 			parser->s_quote_track = 1;
 
 			// reset
-			noizu_trie__init(parser->req, parser->trie_definition, parser->trie_state->options, parser->trie_state);
+			noizu_trie__reset(parser->trie_definition, parser->trie_state->options, parser->trie_state);
 			parser->trie_state->options.delimiter = '\'';
 			
 			return parser->parse_state;
@@ -330,7 +330,7 @@ json_parse_state ICACHE_FLASH_ATTR json_process__ADVANCE_KEY(json_parser* parser
 				parser->token = 0;
 
 				// reset
-				noizu_trie__init(parser->req, parser->trie_definition, parser->trie_state->options, parser->trie_state);
+				noizu_trie__reset(parser->trie_definition, parser->trie_state->options, parser->trie_state);
 				parser->trie_state->options.delimiter = ':';
 
 				parser->parse_state = PS_PARSE_KEY;
@@ -1555,7 +1555,7 @@ uint8_t ICACHE_FLASH_ATTR  json_parser__extract_token(json_parser* parser, struc
 		// Note value starts at the opening quote and ends at the closing quote. 
 		uint8_t i = 0;
 		// reset not init
-		noizu_trie__init(parser->req, parser->trie_definition, parser->trie_state->options, parser->trie_state);
+		noizu_trie__reset(parser->trie_definition, parser->trie_state->options, parser->trie_state);
 		state->req_position = parser->value_start + 1;
 		TRIE_TOKEN o = noizu_trie__tokenize(state, definition, NULL);
 		if (state->req_position == (parser->value_start + len) && !(o & TRIE_ERROR) && state->token) {

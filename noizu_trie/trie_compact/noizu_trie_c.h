@@ -46,6 +46,7 @@ typedef struct noizu_trie__compact__definition {
 	noizu_trie_c_char_code char_code;
 } noizu_trie_compact_definition;
 
+TRIE_TOKEN noizu_trie__compact__reset(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out);
 TRIE_TOKEN noizu_trie__compact__init(offset_buffer* req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out);
 TRIE_TOKEN noizu_trie__compact__free(struct noizu_trie_state* state, struct noizu_trie_definition* definition, TRIE_TOKEN mode);
 TRIE_TOKEN noizu_trie__compact__validate(struct noizu_trie_state* state, struct noizu_trie_definition* definition);

@@ -34,6 +34,21 @@ TRIE_TOKEN noizu_trie__next_char(struct noizu_trie_state* state, struct noizu_tr
 }
 
 
+TRIE_TOKEN noizu_trie__reset(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* state) {
+	if (state == NULL) return TRIE_ARGUMENT_ERROR__NULL_STATE;
+	void* p = state->type_state;
+	TRIE_TOKEN t = state->type;
+	offset_buffer* req = state->req;
+
+	os_memset(state, 0, sizeof(noizu_trie_state));
+	state->type = t;
+	state->type_state = p;
+	state->req = req;
+	state->options = options;
+	state->req_position = req->buffer_pos;
+	return definition->trie_reset ? definition->trie_reset(definition, options, state) : TRIE_ARGUMENT_ERROR__TYPE_RESET_NOT_SET;
+}
+
 TRIE_TOKEN noizu_trie__init(offset_buffer* req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out) {
 	if (out == NULL) return TRIE_ARGUMENT_ERROR__NULL_STATE;
 	void* p = out->type_state;

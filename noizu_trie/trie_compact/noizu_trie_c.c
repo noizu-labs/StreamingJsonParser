@@ -36,6 +36,10 @@ TRIE_TOKEN inline EXTRACT_TRIE_VALUE(uint32_t index, uint8_t record_size, uint8_
 #define EXTRACT_SIB_JUMP(index, trie) EXTRACT_TRIE_VALUE((index), (trie)->bit_length, (trie)->bit_length__character_code, (trie)->bit_length__sibling_relative_index, (trie)->trie_raw, (trie)->trie_raw_length)
 #define EXTRACT_CHAR(index, trie) EXTRACT_TRIE_VALUE((index), (trie)->bit_length, 0, (trie)->bit_length__character_code, (trie)->trie_raw, (trie)->trie_raw_length)
 
+TRIE_TOKEN noizu_trie__compact__reset(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out) {
+	noizu_trie__compact__init(NULL, definition, options, out);
+}
+
 TRIE_TOKEN noizu_trie__compact__init(offset_buffer* req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out) {
 	if (out->type_state && out->type && out->type != TRIE_COMPACT_TYPE) return TRIE_ARGUMENT_ERROR__INVALID_TYPE_STATE;
 	out->type = TRIE_COMPACT_TYPE;

@@ -47,6 +47,7 @@ typedef struct noizu_trie__struct__definition {
  */
 TRIE_S_UNIT noizu_trie_s_advance(char k, TRIE_S_UNIT current_node, noizu_trie_s* source);
 
+TRIE_TOKEN noizu_trie__struct__reset(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out);
 TRIE_TOKEN noizu_trie__struct__init(offset_buffer* req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out);
 TRIE_TOKEN noizu_trie__struct__free(struct noizu_trie_state* state, struct noizu_trie_definition* definition, TRIE_TOKEN mode);
 TRIE_TOKEN noizu_trie__struct__validate(struct noizu_trie_state* state, struct noizu_trie_definition* definition);

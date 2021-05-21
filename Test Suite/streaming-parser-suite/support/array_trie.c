@@ -95,6 +95,7 @@ struct noizu_trie_definition array_test_trie = {
     .type = TRIE_ARRAY_TYPE,
     .type_definition = &__internal_array_test_trie_inner_def,
     .trie_init = noizu_trie__array__init,
+	.trie_reset = noizu_trie__array__reset,
     .trie_free = noizu_trie__array__free,
     .trie_validate = noizu_trie__array__validate,
     .trie_advance = noizu_trie__array__advance,

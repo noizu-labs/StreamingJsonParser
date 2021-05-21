@@ -149,7 +149,7 @@ typedef request_args_t offset_buffer;
 #define TRIE_ARGUMENT_ERROR__TYPE_ADVANCE_NOT_SET (TRIE_ARGUMENT_ERROR__TYPE | 0x000A)
 #define TRIE_ARGUMENT_ERROR__TYPE_TOKENIZE_NOT_SET (TRIE_ARGUMENT_ERROR__TYPE | 0x000B)
 #define TRIE_ARGUMENT_ERROR__TYPE_FREE_NOT_SET (TRIE_ARGUMENT_ERROR__TYPE | 0x000C)
-
+#define TRIE_ARGUMENT_ERROR__TYPE_RESET_NOT_SET (TRIE_ARGUMENT_ERROR__TYPE | 0x000D)
 
 #define TRIE_ERROR_DEALLOC_CONSTANT_DEFINITION (TRIE_ERROR | 0x0010)
 
@@ -186,6 +186,7 @@ typedef TRIE_TOKEN(*tokenizer_sentinel)(TRIE_TOKEN advance_flag, struct noizu_tr
 
 // Per Implementation callbacks
 typedef TRIE_TOKEN(*tokenizer_init)(offset_buffer* req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out);
+typedef TRIE_TOKEN(*tokenizer_reset)(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* state);
 typedef TRIE_TOKEN(*tokenizer_free)(struct noizu_trie_state* out, struct noizu_trie_definition* definition, TRIE_TOKEN mode);
 typedef TRIE_TOKEN(*tokenizer_validate)(struct noizu_trie_state* state, struct noizu_trie_definition* definition);
 typedef TRIE_TOKEN(*tokenizer_advance)(struct noizu_trie_state* state, struct noizu_trie_definition* definition);
@@ -202,6 +203,7 @@ typedef struct noizu_trie_definition {
 
 	
 	tokenizer_init trie_init;
+	tokenizer_reset trie_reset;
 	tokenizer_free trie_free;
 	tokenizer_validate trie_validate;
 	tokenizer_advance trie_advance;
@@ -266,8 +268,8 @@ TRIE_TOKEN noizu_trie__next_char(struct noizu_trie_state* state, struct noizu_tr
  * Init trie state for processing.
  */
 TRIE_TOKEN noizu_trie__init(offset_buffer *req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out);
+TRIE_TOKEN noizu_trie__reset(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* state);
 TRIE_TOKEN noizu_trie__free(struct noizu_trie_state* state, struct noizu_trie_definition* definition, TRIE_TOKEN mode);
-
 
 /*!
  * Validate definition and state

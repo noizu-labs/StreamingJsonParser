@@ -72,7 +72,7 @@ typedef struct noizu_trie__array__definition {
 TRIE_A_UNIT noizu_trie_a_advance(char key, TRIE_A_UNIT position, noizu_trie_a source[]);
 
 
-
+TRIE_TOKEN noizu_trie__array__reset(struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out);
 TRIE_TOKEN noizu_trie__array__init(offset_buffer* req, struct noizu_trie_definition* definition, struct noizu_trie_options options, struct noizu_trie_state* out);
 TRIE_TOKEN noizu_trie__array__validate(struct noizu_trie_state* state, struct noizu_trie_definition* definition);
 TRIE_TOKEN noizu_trie__array__free(struct noizu_trie_state* state, struct noizu_trie_definition* definition, TRIE_TOKEN mode);
