@@ -639,8 +639,21 @@ json_parse_state ICACHE_FLASH_ATTR json_process__CAPTURE_VALUE(json_parser* pars
 		// Check for end condition
 		switch (parser->value_type) {
 		case JSON_FALSE_VALUE:
-		case JSON_TRUE_VALUE:
+		case JSON_TRUE_VALUE:			
+			if ((parser->req->buffer_pos - parser->value_start) > 4) {
+				parser->value_type = JSON_ERROR_VALUE;
+				return PS_ERROR;
+			}
 			if (c == 'e') {
+				if (parser->value_type == JSON_TRUE_VALUE && ((parser->req->buffer_pos - parser->value_start) != 3 || os_strncmp(parser->req->buffer + parser->value_start, "true", 4) != 0)) {
+					parser->value_type = JSON_ERROR_VALUE;
+					return PS_ERROR;
+				}
+				else if (parser->value_type == JSON_FALSE_VALUE && ((parser->req->buffer_pos - parser->value_start) != 4 || os_strncmp(parser->req->buffer + parser->value_start, "false", 5) != 0)) {
+					parser->value_type = JSON_ERROR_VALUE;
+					return PS_ERROR;
+				}
+
 				parser->char_skip = 1;
 				parser->value_close = parser->req->buffer_pos;
 				if (parser->parent_p) parser->parent_p->value_close = parser->req->buffer_pos;
@@ -656,8 +669,17 @@ json_parse_state ICACHE_FLASH_ATTR json_process__CAPTURE_VALUE(json_parser* pars
 			break;
 
 		case JSON_NULL_VALUE:
+			if ((parser->req->buffer_pos - parser->value_start) > 3) {
+				parser->value_type = JSON_ERROR_VALUE;
+				return PS_ERROR;
+			}
 			if (c == 'l') {
 				if (parser->null_track) {
+					if ((parser->req->buffer_pos - parser->value_start) != 3 || os_strncmp(parser->req->buffer + parser->value_start, "null", 4) != 0) {
+						parser->value_type = JSON_ERROR_VALUE;
+						return PS_ERROR;
+					}
+					
 					parser->char_skip = 1;
 					parser->parse_state = PS_COMPLETE;
 					parser->value_close = parser->req->buffer_pos;

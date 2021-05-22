@@ -14,13 +14,21 @@ TEST_GROUP_RUNNER(StreamingParser)
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalseInner);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNullInner);
 	
-	
+
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolTrueInner_Typo);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalseInner_Typo);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNullInner_Typo);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolTrueInner_Overflow);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalseInner_Overflow);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNullInner_Overflow);
+
+
 
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolTrueInner_SplitEdgeCase);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalseInner_SplitEdgeCase);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNullInner_SplitEdgeCase);
 
-	
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalse_NullFallThroughEdgeCase);
 	
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseArray);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseStringArray);
