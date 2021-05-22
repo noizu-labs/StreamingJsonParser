@@ -3,11 +3,25 @@
 
 TEST_GROUP_RUNNER(StreamingParser)
 {
+	
 	RUN_TEST_CASE(StreamingParser, UnitTest_ResizeDynamicArray);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNestedStruct);
-
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolTrue);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalse);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNull);
+
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolTrueInner);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalseInner);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNullInner);
+	
+	
+
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolTrueInner_SplitEdgeCase);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseBoolFalseInner_SplitEdgeCase);
+	RUN_TEST_CASE(StreamingParser, UnitTest_ParseNullInner_SplitEdgeCase);
+
+	
+	
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseArray);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseStringArray);
 	RUN_TEST_CASE(StreamingParser, UnitTest_ParseTokenArray);
@@ -24,5 +38,6 @@ TEST_GROUP_RUNNER(StreamingParser)
 
 
 	RUN_TEST_CASE(StreamingParser, UnitTest_BufferEnd);
+	
 }
 

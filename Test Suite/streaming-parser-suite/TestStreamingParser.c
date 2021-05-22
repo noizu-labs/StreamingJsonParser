@@ -13,7 +13,7 @@ struct test_output {
 	nullable_sint63_t array_test[6];
 	nullable_string_t string_array_test[6];
 	nullable_token_t token_array_test[6];
-	nullable_sint63_t enabled;
+	nullable_bool_t enabled;
 	nullable_sint63_t featured;
 	nullable_sint63_t fields;
 	nullable_sint63_t one;
@@ -113,7 +113,7 @@ jsp_cb_command test4_cb(json_parse_state state, json_parser* parser) {
 				json_parser__extract_sint63(parser, &out->fields);
 				break;
 			case JK_ENABLED:
-				json_parser__extract_sint63(parser, &out->enabled);
+				json_parser__extract_bool(parser, &out->enabled);
 				break;
 			case JK_FEATURED:
 				json_parser__extract_sint63(parser, &out->featured);
@@ -165,7 +165,7 @@ jsp_cb_command test4b_cb(json_parse_state state, json_parser* parser) {
 				json_parser__extract_sint63(parser, &out->fields);
 				break;
 			case JK_ENABLED:
-				json_parser__extract_sint63(parser, &out->enabled);
+				json_parser__extract_bool(parser, &out->enabled);
 				break;
 			case JK_FEATURED:
 				json_parser__extract_sint63(parser, &out->featured);
@@ -260,14 +260,21 @@ jsp_cb_command test5_cb(json_parse_state state, json_parser* parser) {
 				json_parser__extract_sint63(parser, &out->fields);
 				break;
 			case JK_ENABLED:
-				json_parser__extract_sint63(parser, &out->enabled);
+				json_parser__extract_bool(parser, &out->enabled);
+
 				break;
 			case JK_FEATURED:
 				json_parser__extract_sint63(parser, &out->featured);
 				break;
 
+			case JK_ONE:
+				json_parser__extract_sint63(parser, &out->one);
+				break;
 			case JK_TWO:
 				json_parser__extract_sint63(parser, &out->two);
+				break;
+			case JK_THREE:
+				json_parser__extract_sint63(parser, &out->three);
 				break;
 			}
 		}
@@ -416,6 +423,200 @@ TEST(StreamingParser, UnitTest_ParseBoolFalse)
 	TEST_ASSERT_EQUAL(out->bool_test.null, NOT_NULL_VALUE);
 	TEST_ASSERT_EQUAL(out->bool_test.value, 0);
 }
+
+
+
+/*!
+ *@brief
+ *
+ *
+ */
+TEST(StreamingParser, UnitTest_ParseNull)
+{
+	uint8_t json[] = "null";
+	req->buffer = json;
+	req->buffer_size = ((uint32_t)os_strlen(json)) + 1;
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+	TEST_ASSERT_EQUAL(out->bool_test.null, NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->bool_test.value, 0);
+}
+
+
+
+
+
+/*!
+ *@brief
+ *
+ *
+ */
+TEST(StreamingParser, UnitTest_ParseBoolTrueInner)
+{
+	uint8_t json[] = "{one:1,\"enabled\":true,'three':4}";
+	req->buffer = json;
+	req->buffer_size = ((uint32_t)os_strlen(json));
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test5_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+	TEST_ASSERT_EQUAL(out->one.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->one.value,  1);
+	TEST_ASSERT_EQUAL(out->enabled.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->enabled.value, 1);
+	TEST_ASSERT_EQUAL(out->three.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->three.value, 4);	
+}
+
+
+/*!
+ *@brief
+ *
+ *
+ */
+TEST(StreamingParser, UnitTest_ParseBoolFalseInner)
+{
+	uint8_t json[] = "{one:1,\"enabled\":false,'three': 4}";
+	req->buffer = json;
+	req->buffer_size = ((uint32_t)os_strlen(json));
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test5_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+	TEST_ASSERT_EQUAL(out->one.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->one.value, 1);
+	TEST_ASSERT_EQUAL(out->enabled.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->enabled.value, 0);
+	TEST_ASSERT_EQUAL(out->three.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->three.value, 4);
+}
+
+
+
+
+/*!
+ *@brief
+ *
+ *
+ */
+TEST(StreamingParser, UnitTest_ParseNullInner)
+{
+	uint8_t json[] = "{one:4,\"two\":null,'three':6}";
+	req->buffer = json;
+	req->buffer_size = ((uint32_t)os_strlen(json));
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test5_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+	TEST_ASSERT_EQUAL(out->one.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->one.value, 4);
+	TEST_ASSERT_EQUAL(out->two.null, NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->two.value, 0);
+	TEST_ASSERT_EQUAL(out->three.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->three.value, 6);
+}
+
+
+
+
+
+/*!
+ *@brief
+ *
+ *
+ */
+TEST(StreamingParser, UnitTest_ParseBoolFalseInner_SplitEdgeCase)
+{
+	uint8_t json[] = "{one:4,\"enabled\":false";
+	uint8_t json2[] = ",'three':6}";
+	uint8_t scratch[256] = { 0 };
+	req->buffer = scratch;
+	os_strncpy(req->buffer, json, os_strlen(json));
+	req->buffer_size = ((uint32_t)os_strlen(json));
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test5_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+
+	os_strncpy(req->buffer + req->buffer_size, json2, os_strlen(json2));
+	req->buffer_size += os_strlen(json2);
+	json_streaming_parser(parser);
+
+	TEST_ASSERT_EQUAL(out->one.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->one.value, 4);
+	TEST_ASSERT_EQUAL(out->enabled.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->enabled.value, 0);
+	TEST_ASSERT_EQUAL(out->three.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->three.value, 6);
+}
+
+
+/*!
+ *@brief
+ *
+ *
+ */
+TEST(StreamingParser, UnitTest_ParseBoolTrueInner_SplitEdgeCase)
+{
+	uint8_t json[] = "{one:4,\"enabled\":tru";
+	uint8_t json2[] = "e,'three':6}";
+	uint8_t scratch[256] = { 0 };
+	req->buffer = scratch;
+	os_strncpy(req->buffer, json, os_strlen(json));
+	req->buffer_size = ((uint32_t)os_strlen(json));
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test5_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+
+	os_strncpy(req->buffer + req->buffer_size, json2, os_strlen(json2));
+	req->buffer_size += os_strlen(json2);
+	json_streaming_parser(parser);
+
+	TEST_ASSERT_EQUAL(out->one.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->one.value, 4);
+	TEST_ASSERT_EQUAL(out->enabled.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->enabled.value, 1);
+	TEST_ASSERT_EQUAL(out->three.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->three.value, 6);
+}
+
+
+
+
+/*!
+ *@brief
+ *
+ *
+ */
+TEST(StreamingParser, UnitTest_ParseNullInner_SplitEdgeCase)
+{
+	// This previously failed due to unset skip_chart in null string detection.
+	uint8_t json[] = "{one:4,\"two\":nul";
+	uint8_t json2[] = "l,'three':6}";
+	uint8_t scratch[256] = { 0 };
+	req->buffer = scratch;
+	os_strncpy(req->buffer, json, os_strlen(json));
+	req->buffer_size = ((uint32_t)os_strlen(json));
+	noizu_trie_options options = { 0 };
+	json_parser* parser = init_json_parser(req, options, &array_test_trie, test5_cb, out);
+	parser->parse_state = PS_ADVANCE_VALUE;
+	json_streaming_parser(parser);
+	
+	os_strncpy(req->buffer + req->buffer_size, json2, os_strlen(json2));
+	req->buffer_size += os_strlen(json2);
+	json_streaming_parser(parser);
+		
+	TEST_ASSERT_EQUAL(out->one.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->one.value, 4);
+	TEST_ASSERT_EQUAL(out->two.null, NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->two.value, 0);
+	TEST_ASSERT_EQUAL(out->three.null, NOT_NULL_VALUE);
+	TEST_ASSERT_EQUAL(out->three.value, 6);
+}
+
 
 
 /*!
